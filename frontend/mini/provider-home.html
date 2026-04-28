@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>服务方测试首页</title>
+  </head>
+  <body>
+    <h1>服务方测试首页（最小版）</h1>
+    <p><a href="/mini/provider-onboard">去入驻申请页</a></p>
+    <p id="user"></p>
+    <button id="logout">退出登录</button>
+
+    <script>
+      const token = localStorage.getItem('mini_token');
+      if (!token) {
+        location.href = '/mini/login';
+      }
+
+      async function loadCurrentUser() {
+        const res = await fetch('/api/auth/current-user', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          localStorage.removeItem('mini_token');
+          location.href = '/mini/login';
+          return;
+        }
+        document.getElementById('user').textContent = `当前用户：${data.username}（${data.role}）`;
+      }
+
+      document.getElementById('logout').addEventListener('click', async () => {
+        await fetch('/api/auth/logout', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        localStorage.removeItem('mini_token');
+        location.href = '/mini/login';
+      });
+
+      loadCurrentUser();
+    </script>
+  </body>
+</html>

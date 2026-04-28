@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>服务方入驻审核</title>
+  </head>
+  <body>
+    <h1>服务方入驻审核（最小版）</h1>
+    <p><a href="/dashboard">返回首页</a></p>
+    <p id="msg"></p>
+    <table border="1" cellpadding="6">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>用户</th>
+          <th>姓名</th>
+          <th>区域</th>
+          <th>状态</th>
+          <th>操作</th>
+        </tr>
+      </thead>
+      <tbody id="rows"></tbody>
+    </table>
+
+    <script>
+      const token = localStorage.getItem('token');
+      const msg = document.getElementById('msg');
+      const rows = document.getElementById('rows');
+      if (!token) {
+        location.href = '/admin';
+      }
+
+      async function audit(id, action) {
+        const remark = prompt('请输入审核备注（可留空）') || '';
+        const res = await fetch(`/api/admin/provider-onboard/${id}/audit`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ action, remark }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          alert(data.detail || '审核失败');
+          return;
+        }
+        alert(`已更新为 ${data.status}`);
+        loadList();
+      }
+
+      async function loadList() {
+        const res = await fetch('/api/admin/provider-onboard', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          msg.textContent = data.detail || '加载失败';
+          return;
+        }
+        msg.textContent = `共 ${data.items.length} 条`;
+        rows.innerHTML = '';
+        data.items.forEach((item) => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td>${item.id}</td>
+            <td>${item.provider_username}</td>
+            <td>${item.real_name}</td>
+            <td>${item.service_area}</td>
+            <td>${item.status}</td>
+            <td>
+              <button onclick="audit(${item.id}, 'APPROVE')">通过</button>
+              <button onclick="audit(${item.id}, 'REJECT')">驳回</button>
+            </td>
+          `;
+          rows.appendChild(tr);
+        });
+      }
+
+      window.audit = audit;
+      loadList();
+    </script>
+  </body>
+</html>

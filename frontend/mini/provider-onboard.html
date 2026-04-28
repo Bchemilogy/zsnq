@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>服务方入驻申请</title>
+  </head>
+  <body>
+    <h1>服务方入驻申请（最小版）</h1>
+    <p><a href="/mini/provider-home">返回服务方首页</a></p>
+
+    <form id="form">
+      <p>姓名：<input id="real_name" required /></p>
+      <p>手机号：<input id="phone" required /></p>
+      <p>服务区域：<input id="service_area" required /></p>
+      <p>凭证图片 URL（多个用逗号分隔）：<input id="credential_images" /></p>
+      <button type="submit">提交入驻</button>
+    </form>
+
+    <p id="submit_msg"></p>
+    <hr />
+    <h3>当前审核状态</h3>
+    <pre id="status"></pre>
+
+    <script>
+      const token = localStorage.getItem('mini_token');
+      if (!token) {
+        location.href = '/mini/login';
+      }
+
+      const statusEl = document.getElementById('status');
+      const submitMsgEl = document.getElementById('submit_msg');
+      const statusTextMap = {
+        NONE: '未提交',
+        PENDING: '待审核',
+        APPROVED: '已通过',
+        REJECTED: '已驳回',
+      };
+
+      async function loadStatus() {
+        const res = await fetch('/api/provider/onboard-status', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          statusEl.textContent = data.detail || '查询失败';
+          return;
+        }
+        const humanStatus = statusTextMap[data.status] || data.status;
+        statusEl.textContent = `当前状态：${humanStatus}\n` + JSON.stringify(data, null, 2);
+      }
+
+      document.getElementById('form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const payload = {
+          real_name: document.getElementById('real_name').value,
+          phone: document.getElementById('phone').value,
+          service_area: document.getElementById('service_area').value,
+          credential_images: document
+            .getElementById('credential_images')
+            .value.split(',')
+            .map((x) => x.trim())
+            .filter(Boolean),
+        };
+
+        const res = await fetch('/api/provider/onboard-submit', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          submitMsgEl.textContent = data.detail || '提交失败';
+          return;
+        }
+        submitMsgEl.textContent = `提交成功，状态：${statusTextMap[data.status] || data.status}`;
+        loadStatus();
+      });
+
+      loadStatus();
+    </script>
+  </body>
+</html>

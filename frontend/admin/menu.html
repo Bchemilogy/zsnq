@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>菜单管理</title>
+  </head>
+  <body>
+    <h1>菜单管理（最小版）</h1>
+    <p><a href="/dashboard">返回首页</a></p>
+    <p id="msg"></p>
+    <table border="1" cellpadding="6">
+      <thead>
+        <tr>
+          <th>角色</th>
+          <th>菜单名称</th>
+          <th>路径</th>
+        </tr>
+      </thead>
+      <tbody id="rows"></tbody>
+    </table>
+
+    <script>
+      const token = localStorage.getItem('token');
+      const msg = document.getElementById('msg');
+      const rows = document.getElementById('rows');
+
+      if (!token) {
+        location.href = '/admin';
+      }
+
+      async function loadMenus() {
+        const res = await fetch('/api/system/menu', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = await res.json();
+
+        if (res.status === 401) {
+          localStorage.removeItem('token');
+          location.href = '/admin';
+          return;
+        }
+
+        if (res.status === 403) {
+          msg.textContent = '当前账号无权限查看菜单管理';
+          return;
+        }
+
+        msg.textContent = `共 ${data.items.length} 条菜单映射`;
+        rows.innerHTML = '';
+        data.items.forEach((item) => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `<td>${item.role}</td><td>${item.name}</td><td>${item.path}</td>`;
+          rows.appendChild(tr);
+        });
+      }
+
+      loadMenus();
+    </script>
+  </body>
+</html>

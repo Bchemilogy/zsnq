@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>后台登录</title>
+  </head>
+  <body>
+    <h1>智枢农擎后台登录</h1>
+    <form id="login-form">
+      <label>账号：<input id="username" value="admin" /></label><br /><br />
+      <label>密码：<input id="password" type="password" value="admin123" /></label><br /><br />
+      <button type="submit">登录</button>
+    </form>
+    <p id="msg"></p>
+
+    <script>
+      const form = document.getElementById('login-form');
+      const msg = document.getElementById('msg');
+
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        msg.textContent = '登录中...';
+
+        const username = document.getElementById('username').value;
+        const password = document.getElementById('password').value;
+
+        const res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password, client_type: 'PC' }),
+        });
+
+        const data = await res.json();
+        if (!res.ok) {
+          msg.textContent = data.detail || '登录失败';
+          return;
+        }
+
+        localStorage.setItem('token', data.token);
+        location.href = '/dashboard';
+      });
+    </script>
+  </body>
+</html>

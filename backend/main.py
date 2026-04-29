@@ -27,6 +27,9 @@ class LoginRequest(BaseModel):
 class WechatLoginRequest(BaseModel):
     code: str
 
+class ProviderPhoneLoginRequest(BaseModel):
+    contactPhone: str
+
 
 class ProviderOnboardSubmitRequest(BaseModel):
     real_name: str
@@ -400,6 +403,21 @@ def login(req: LoginRequest):
     token = _create_token(user, req.client_type)
     return {"token": token, "role": user["role"]}
 
+
+
+@app.post("/api/auth/provider-phone-login")
+def auth_provider_phone_login(req: ProviderPhoneLoginRequest):
+    provider = next((x for x in PROVIDERS if x.get("contactPhone") == req.contactPhone), None)
+    if not provider:
+        raise HTTPException(status_code=404, detail="联系电话未找到对应服务方")
+    latest = _latest_apply_by_user(provider.get("userId", 0))
+    if not latest or latest.get("auditStatus") != "APPROVED":
+        raise HTTPException(status_code=403, detail="服务方未通过审核")
+    user = next((u for u in USERS.values() if u["id"] == provider.get("userId")), None)
+    if not user:
+        raise HTTPException(status_code=404, detail="服务方账号不存在")
+    token = _create_token(user)
+    return {"token": token, "role": user["role"], "username": user["username"]}
 
 @app.post("/api/auth/wechat-login")
 def wechat_login(req: WechatLoginRequest):

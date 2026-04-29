@@ -1,0 +1,4 @@
+<!doctype html><html lang='zh-CN'><head><meta charset='UTF-8'/><meta name='viewport' content='width=device-width,initial-scale=1.0'/><title>我的服务能力</title><link rel='stylesheet' href='/theme.css'/></head><body><div class="banner">农服数字平台</div><h1>我的服务能力</h1><p><a href='/mini/provider-home'>返回工作台</a> | <a href='/mini/provider-ability-edit'>新增能力</a> | <a href='/mini/provider-ability-detail'>查看能力详情</a></p><p id='msg'></p><pre id='list'></pre><script>
+const t=localStorage.getItem('mini_token');if(!t)location.href='/mini/login';
+(async()=>{const r=await fetch('/api/provider/ability/list',{headers:{Authorization:`Bearer ${t}`}});const d=await r.json();if(!r.ok){msg.textContent=d.detail;return;}list.textContent=JSON.stringify(d.data,null,2);})();
+</script></body></html>

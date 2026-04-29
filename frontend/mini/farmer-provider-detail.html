@@ -1,0 +1,7 @@
+<!doctype html><html lang='zh-CN'><head><meta charset='UTF-8'/><meta name='viewport' content='width=device-width,initial-scale=1.0'/><title>服务方详情</title><link rel='stylesheet' href='/theme.css'/></head><body><div class="banner">农服数字平台</div><h1>服务方详情</h1><p><a href='javascript:history.back()'>返回列表</a></p><pre id='detail'></pre><button id='phone'>一键拨打电话</button><button id='wx'>复制微信号</button><p id='msg'></p><script>
+const t=localStorage.getItem('mini_token');if(!t)location.href='/mini/login';const qs=new URLSearchParams(location.search);const providerId=Number(qs.get('providerId'));const abilityId=Number(qs.get('abilityId'));let data;
+async function contact(type){const r=await fetch('/api/farmer/contact-log/create',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${t}`},body:JSON.stringify({providerId,abilityId,contactType:type,sourcePage:'SERVICE_DETAIL'})});const d=await r.json();msg.textContent=r.ok?d.message:d.detail;}
+(async()=>{const r=await fetch(`/api/farmer/provider/detail?providerId=${providerId}&abilityId=${abilityId}`,{headers:{Authorization:`Bearer ${t}`}});data=await r.json();if(!r.ok){detail.textContent=data.detail;return;}detail.textContent=JSON.stringify(data.data,null,2);})();
+document.getElementById('phone').addEventListener('click',()=>contact('PHONE'));
+document.getElementById('wx').addEventListener('click',async()=>{await contact('WECHAT');if(data&&data.data&&data.data.ability){navigator.clipboard.writeText(data.data.ability.wechatNo||'');}});
+</script></body></html>

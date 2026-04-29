@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title>后台首页</title><link rel='stylesheet' href='/theme.css'/>
+  <style>body{font-family:Arial,'Microsoft YaHei';background:#f1f5f9;margin:0}.wrap{max-width:1000px;margin:20px auto;padding:0 12px}.card{background:#fff;border-radius:12px;padding:16px;box-shadow:0 8px 24px rgba(15,23,42,.08)}ul{line-height:1.9}</style></head>
+  <body><div class="banner">农服数字平台</div><div class="wrap"><div class="card">
+    <h1>后台首页</h1><p id="user"></p><h3>统计</h3><pre id="stats"></pre><h3>菜单</h3><ul id="menus"></ul><button id="logout">退出登录</button>
+  </div></div>
+<script>
+const token=localStorage.getItem('token');const stats=document.getElementById('stats');if(!token)location.href='/admin';
+async function loadCurrentUser(){const res=await fetch('/api/auth/current-user',{headers:{Authorization:`Bearer ${token}`}});const data=await res.json();if(!res.ok){localStorage.removeItem('token');location.href='/admin';return;}document.getElementById('user').textContent=`用户：${data.username}（${data.role}）`;const ul=document.getElementById('menus');ul.innerHTML='';data.menus.forEach((m)=>{const li=document.createElement('li');li.innerHTML=`<a href="${m.path}">${m.name}</a> (${m.path})`;ul.appendChild(li);});}
+async function loadStats(){const res=await fetch('/api/system/dashboard-stats',{headers:{Authorization:`Bearer ${token}`}});const data=await res.json();stats.textContent=res.ok?JSON.stringify(data,null,2):(data.detail||'统计加载失败');}
+document.getElementById('logout').addEventListener('click',async()=>{await fetch('/api/auth/logout',{method:'POST',headers:{Authorization:`Bearer ${token}`}});localStorage.removeItem('token');location.href='/admin';});
+loadCurrentUser();loadStats();
+</script></body></html>

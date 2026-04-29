@@ -418,7 +418,11 @@ def auth_provider_phone_login(req: ProviderPhoneLoginRequest):
     apply = approved_items[-1]
     user = next((u for u in USERS.values() if u["id"] == apply.get("userId")), None)
     if not user:
-        raise HTTPException(status_code=404, detail="服务方账号不存在")
+        user = {
+            "id": apply.get("userId"),
+            "username": apply.get("name") or f'provider_{apply.get("userId")}',
+            "role": "PROVIDER",
+        }
     token = _create_token(user, "MINI")
     return {"token": token, "role": user["role"], "username": user["username"]}
 

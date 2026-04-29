@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title>驳回详情</title>
+  <style>body{font-family:Arial,'Microsoft YaHei';background:#fff7ed;margin:0}.card{max-width:620px;margin:40px auto;background:#fff;padding:22px;border-radius:14px;box-shadow:0 10px 24px rgba(15,23,42,.08)}</style></head>
+  <body>
+    <div class="card">
+      <h1>入驻申请未通过</h1>
+      <p id="state"></p>
+      <p id="reason"></p>
+      <button onclick="location.href='/mini/provider-onboard'">修改资料并重新提交</button>
+    </div>
+    <script>
+      const token = localStorage.getItem('mini_token');
+      if (!token) location.href = '/mini/login';
+      async function load() {
+        const res = await fetch('/api/provider/apply/status', { headers: { Authorization: `Bearer ${token}` } });
+        const data = await res.json();
+        if (!res.ok) { document.getElementById('reason').textContent = data.detail; return; }
+        document.getElementById('state').textContent = `状态：未通过（${data.auditStatus}）`;
+        document.getElementById('reason').textContent = `驳回原因：${data.rejectReason || '无'}`;
+      }
+      load();
+    </script>
+  </body>
+</html>

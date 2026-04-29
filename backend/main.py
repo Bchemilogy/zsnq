@@ -39,9 +39,39 @@ class ProviderOnboardAuditRequest(BaseModel):
     remark: str = ""
 
 
+class ProviderApplySubmitRequest(BaseModel):
+    providerName: str
+    contactName: str
+    contactPhone: str
+    providerType: str
+    regionCode: str | None = None
+    address: str
+    serviceTypes: list[str]
+    serviceDescription: str = ""
+    serviceArea: str = ""
+    attachments: list[dict] = []
+
+
+class ProviderApplyApproveRequest(BaseModel):
+    applyId: int
+    auditRemark: str = ""
+
+
+class ProviderApplyRejectRequest(BaseModel):
+    applyId: int
+    rejectReason: str
+
+
+class FileUploadRequest(BaseModel):
+    fileName: str
+    fileType: str
+    fileSize: int = 0
+
+
 USERS = {
     "admin": {"id": 1, "username": "admin", "password": "admin123", "role": "ADMIN"},
     "operator": {"id": 2, "username": "operator", "password": "op123", "role": "OPERATOR"},
+    "gov": {"id": 3, "username": "gov", "password": "gov123", "role": "GOV_ADMIN"},
 }
 ROLE_LIST = [
     {"code": "ADMIN", "name": "系统管理员"},
@@ -82,6 +112,9 @@ TOKENS: dict[str, dict] = {}
 # 登录日志（最小实现，内存态）
 LOGIN_LOGS: list[dict] = []
 PROVIDER_ONBOARDS: list[dict] = []
+PROVIDER_APPLIES: list[dict] = []
+PROVIDERS: list[dict] = []
+PROVIDER_AUDIT_LOGS: list[dict] = []
 
 
 def _menus_by_role(role: str) -> list[dict]:
@@ -184,6 +217,16 @@ def mini_provider_home_page():
 @app.get("/mini/provider-onboard")
 def mini_provider_onboard_page():
     return FileResponse(MINI_DIR / "provider-onboard.html")
+
+
+@app.get("/mini/provider-apply-status")
+def mini_provider_apply_status_page():
+    return FileResponse(MINI_DIR / "provider-apply-status.html")
+
+
+@app.get("/mini/provider-apply-reject")
+def mini_provider_apply_reject_page():
+    return FileResponse(MINI_DIR / "provider-apply-reject.html")
 
 
 @app.get("/operate/provider-audit")
@@ -334,3 +377,227 @@ def admin_provider_onboard_audit(onboard_id: int, req: ProviderOnboardAuditReque
     target["audited_by"] = user["username"]
     target["audited_at"] = datetime.now(timezone.utc).isoformat()
     return {"id": target["id"], "status": target["status"]}
+
+
+def _latest_apply_by_user(user_id: int) -> dict | None:
+    items = [x for x in PROVIDER_APPLIES if x["userId"] == user_id]
+    return items[-1] if items else None
+
+
+@app.get("/api/provider/apply/status")
+def provider_apply_status(user=Depends(current_user)):
+    if user["role"] != "PROVIDER":
+        raise HTTPException(status_code=403, detail="仅服务方可访问")
+    latest = _latest_apply_by_user(user["user_id"])
+    if not latest:
+        return {"auditStatus": "NOT_SUBMITTED"}
+    return {"auditStatus": latest["auditStatus"], "applyId": latest["applyId"], "rejectReason": latest.get("rejectReason", "")}
+
+
+@app.post("/api/provider/apply/submit")
+def provider_apply_submit(req: ProviderApplySubmitRequest, user=Depends(current_user)):
+    if user["role"] != "PROVIDER":
+        raise HTTPException(status_code=403, detail="仅服务方可提交入驻")
+    apply_id = len(PROVIDER_APPLIES) + 10001
+    now = datetime.now(timezone.utc).isoformat()
+    record = {
+        "applyId": apply_id,
+        "userId": user["user_id"],
+        "providerName": req.providerName,
+        "contactName": req.contactName,
+        "contactPhone": req.contactPhone,
+        "providerType": req.providerType,
+        "regionCode": req.regionCode,
+        "address": req.address,
+        "serviceTypes": req.serviceTypes,
+        "serviceDescription": req.serviceDescription,
+        "serviceArea": req.serviceArea,
+        "attachments": req.attachments,
+        "auditStatus": "PENDING",
+        "rejectReason": "",
+        "auditUserName": "",
+        "auditTime": None,
+        "createTime": now,
+        "updateTime": now,
+    }
+    PROVIDER_APPLIES.append(record)
+    return {"code": 200, "message": "入驻申请已提交，请等待审核", "data": {"applyId": apply_id, "auditStatus": "PENDING"}}
+
+
+@app.get("/api/provider/apply/detail")
+def provider_apply_detail(user=Depends(current_user)):
+    if user["role"] != "PROVIDER":
+        raise HTTPException(status_code=403, detail="仅服务方可访问")
+    latest = _latest_apply_by_user(user["user_id"])
+    if not latest:
+        raise HTTPException(status_code=404, detail="暂无入驻申请")
+    return {"code": 200, "data": latest}
+
+
+@app.post("/api/provider/apply/resubmit")
+def provider_apply_resubmit(req: ProviderApplySubmitRequest, user=Depends(current_user)):
+    if user["role"] != "PROVIDER":
+        raise HTTPException(status_code=403, detail="仅服务方可重提")
+    latest = _latest_apply_by_user(user["user_id"])
+    if not latest or latest["auditStatus"] != "REJECTED":
+        raise HTTPException(status_code=400, detail="仅驳回状态可重提")
+    latest.update(
+        {
+            "providerName": req.providerName,
+            "contactName": req.contactName,
+            "contactPhone": req.contactPhone,
+            "providerType": req.providerType,
+            "regionCode": req.regionCode,
+            "address": req.address,
+            "serviceTypes": req.serviceTypes,
+            "serviceDescription": req.serviceDescription,
+            "serviceArea": req.serviceArea,
+            "attachments": req.attachments,
+            "auditStatus": "PENDING",
+            "rejectReason": "",
+            "auditUserName": "",
+            "auditTime": None,
+            "updateTime": datetime.now(timezone.utc).isoformat(),
+        }
+    )
+    return {"code": 200, "message": "已重新提交", "data": {"applyId": latest["applyId"], "auditStatus": "PENDING"}}
+
+
+@app.get("/api/provider/workbench")
+def provider_workbench(user=Depends(current_user)):
+    if user["role"] != "PROVIDER":
+        raise HTTPException(status_code=403, detail="仅服务方可访问")
+    latest = _latest_apply_by_user(user["user_id"])
+    if not latest or latest["auditStatus"] != "APPROVED":
+        raise HTTPException(status_code=403, detail="尚未审核通过，无法进入工作台")
+    provider = next((x for x in PROVIDERS if x["userId"] == user["user_id"]), None)
+    if not provider:
+        raise HTTPException(status_code=404, detail="服务方主体不存在")
+    return {
+        "code": 200,
+        "data": {
+            "providerId": provider["providerId"],
+            "providerName": provider["providerName"],
+            "auditStatus": "APPROVED",
+            "serviceTypes": provider["serviceTypes"],
+            "contactPhone": provider["contactPhone"],
+            "serviceArea": provider["serviceArea"],
+            "profileCompletion": 80,
+        },
+    }
+
+
+@app.get("/api/admin/provider/apply/list")
+def admin_provider_apply_list(user=Depends(current_user)):
+    if user["role"] not in {"ADMIN", "OPERATOR", "GOV_ADMIN"}:
+        raise HTTPException(status_code=403, detail="无权限")
+    return {"code": 200, "data": PROVIDER_APPLIES}
+
+
+@app.get("/api/admin/provider/apply/detail")
+def admin_provider_apply_detail(applyId: int, user=Depends(current_user)):
+    if user["role"] not in {"ADMIN", "OPERATOR", "GOV_ADMIN"}:
+        raise HTTPException(status_code=403, detail="无权限")
+    target = next((x for x in PROVIDER_APPLIES if x["applyId"] == applyId), None)
+    if not target:
+        raise HTTPException(status_code=404, detail="申请不存在")
+    logs = [x for x in PROVIDER_AUDIT_LOGS if x["applyId"] == applyId]
+    return {"code": 200, "data": {"apply": target, "auditLogs": logs}}
+
+
+@app.post("/api/admin/provider/apply/approve")
+def admin_provider_apply_approve(req: ProviderApplyApproveRequest, user=Depends(current_user)):
+    if user["role"] not in {"ADMIN", "OPERATOR"}:
+        raise HTTPException(status_code=403, detail="无权限审核")
+    target = next((x for x in PROVIDER_APPLIES if x["applyId"] == req.applyId), None)
+    if not target:
+        raise HTTPException(status_code=404, detail="申请不存在")
+    target["auditStatus"] = "APPROVED"
+    target["auditUserName"] = user["username"]
+    target["auditTime"] = datetime.now(timezone.utc).isoformat()
+    target["rejectReason"] = ""
+    provider = next((x for x in PROVIDERS if x["userId"] == target["userId"]), None)
+    if not provider:
+        provider = {"providerId": len(PROVIDERS) + 20001, "userId": target["userId"]}
+        PROVIDERS.append(provider)
+    provider.update(
+        {
+            "providerName": target["providerName"],
+            "contactName": target["contactName"],
+            "contactPhone": target["contactPhone"],
+            "providerType": target["providerType"],
+            "serviceTypes": target["serviceTypes"],
+            "serviceArea": target["serviceArea"],
+            "serviceDescription": target["serviceDescription"],
+            "status": "NORMAL",
+            "auditStatus": "APPROVED",
+        }
+    )
+    PROVIDER_AUDIT_LOGS.append(
+        {
+            "applyId": req.applyId,
+            "auditStatus": "APPROVED",
+            "auditUserName": user["username"],
+            "auditRemark": req.auditRemark,
+            "createTime": datetime.now(timezone.utc).isoformat(),
+        }
+    )
+    return {"code": 200, "message": "审核通过"}
+
+
+@app.post("/api/admin/provider/apply/reject")
+def admin_provider_apply_reject(req: ProviderApplyRejectRequest, user=Depends(current_user)):
+    if user["role"] not in {"ADMIN", "OPERATOR"}:
+        raise HTTPException(status_code=403, detail="无权限审核")
+    if not req.rejectReason.strip():
+        raise HTTPException(status_code=400, detail="驳回原因不能为空")
+    target = next((x for x in PROVIDER_APPLIES if x["applyId"] == req.applyId), None)
+    if not target:
+        raise HTTPException(status_code=404, detail="申请不存在")
+    target["auditStatus"] = "REJECTED"
+    target["rejectReason"] = req.rejectReason
+    target["auditUserName"] = user["username"]
+    target["auditTime"] = datetime.now(timezone.utc).isoformat()
+    PROVIDER_AUDIT_LOGS.append(
+        {
+            "applyId": req.applyId,
+            "auditStatus": "REJECTED",
+            "auditUserName": user["username"],
+            "auditRemark": req.rejectReason,
+            "createTime": datetime.now(timezone.utc).isoformat(),
+        }
+    )
+    return {"code": 200, "message": "审核驳回"}
+
+
+@app.get("/api/admin/provider/list")
+def admin_provider_list(user=Depends(current_user)):
+    if user["role"] not in {"ADMIN", "OPERATOR", "GOV_ADMIN"}:
+        raise HTTPException(status_code=403, detail="无权限")
+    return {"code": 200, "data": PROVIDERS}
+
+
+@app.get("/api/admin/provider/detail")
+def admin_provider_detail(providerId: int, user=Depends(current_user)):
+    if user["role"] not in {"ADMIN", "OPERATOR", "GOV_ADMIN"}:
+        raise HTTPException(status_code=403, detail="无权限")
+    target = next((x for x in PROVIDERS if x["providerId"] == providerId), None)
+    if not target:
+        raise HTTPException(status_code=404, detail="服务方不存在")
+    return {"code": 200, "data": target}
+
+
+@app.post("/api/file/upload")
+def file_upload(req: FileUploadRequest, user=Depends(current_user)):
+    ext = req.fileType.lower()
+    if ext not in {"jpg", "jpeg", "png", "pdf"}:
+        raise HTTPException(status_code=400, detail="仅支持 jpg/jpeg/png/pdf")
+    return {
+        "code": 200,
+        "data": {
+            "fileName": req.fileName,
+            "fileUrl": f"https://mock-files.local/{uuid4().hex}_{req.fileName}",
+            "fileSize": req.fileSize,
+            "fileType": ext,
+        },
+    }

@@ -6,17 +6,18 @@
     <title>服务方入驻审核</title>
   </head>
   <body>
-    <h1>服务方入驻审核（最小版）</h1>
+    <h1>服务方入驻审核</h1>
     <p><a href="/dashboard">返回首页</a></p>
     <p id="msg"></p>
     <table border="1" cellpadding="6">
       <thead>
         <tr>
-          <th>ID</th>
-          <th>用户</th>
-          <th>姓名</th>
-          <th>区域</th>
+          <th>申请ID</th>
+          <th>服务方名称</th>
+          <th>联系人</th>
+          <th>电话</th>
           <th>状态</th>
+          <th>提交时间</th>
           <th>操作</th>
         </tr>
       </thead>
@@ -25,60 +26,77 @@
 
     <script>
       const token = localStorage.getItem('token');
-      const msg = document.getElementById('msg');
-      const rows = document.getElementById('rows');
-      if (!token) {
-        location.href = '/admin';
-      }
-
-      async function audit(id, action) {
-        const remark = prompt('请输入审核备注（可留空）') || '';
-        const res = await fetch(`/api/admin/provider-onboard/${id}/audit`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ action, remark }),
-        });
-        const data = await res.json();
-        if (!res.ok) {
-          alert(data.detail || '审核失败');
-          return;
-        }
-        alert(`已更新为 ${data.status}`);
-        loadList();
-      }
+      if (!token) location.href = '/admin';
 
       async function loadList() {
-        const res = await fetch('/api/admin/provider-onboard', {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const res = await fetch('/api/admin/provider/apply/list', { headers: { Authorization: `Bearer ${token}` } });
         const data = await res.json();
         if (!res.ok) {
-          msg.textContent = data.detail || '加载失败';
+          document.getElementById('msg').textContent = data.detail || '加载失败';
           return;
         }
-        msg.textContent = `共 ${data.items.length} 条`;
+        const items = data.data || [];
+        document.getElementById('msg').textContent = `共 ${items.length} 条`;
+        const rows = document.getElementById('rows');
         rows.innerHTML = '';
-        data.items.forEach((item) => {
+        items.forEach((item) => {
           const tr = document.createElement('tr');
           tr.innerHTML = `
-            <td>${item.id}</td>
-            <td>${item.provider_username}</td>
-            <td>${item.real_name}</td>
-            <td>${item.service_area}</td>
-            <td>${item.status}</td>
+            <td>${item.applyId}</td>
+            <td>${item.providerName}</td>
+            <td>${item.contactName}</td>
+            <td>${item.contactPhone}</td>
+            <td>${item.auditStatus}</td>
+            <td>${item.createTime || ''}</td>
             <td>
-              <button onclick="audit(${item.id}, 'APPROVE')">通过</button>
-              <button onclick="audit(${item.id}, 'REJECT')">驳回</button>
+              <button onclick="viewDetail(${item.applyId})">查看详情</button>
+              <button onclick="approve(${item.applyId})">通过</button>
+              <button onclick="rejectApply(${item.applyId})">驳回</button>
             </td>
           `;
           rows.appendChild(tr);
         });
       }
 
-      window.audit = audit;
+      async function viewDetail(applyId) {
+        const res = await fetch(`/api/admin/provider/apply/detail?applyId=${applyId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = await res.json();
+        alert(JSON.stringify(data, null, 2));
+      }
+
+      async function approve(applyId) {
+        const remark = prompt('审核备注（可空）') || '';
+        const res = await fetch('/api/admin/provider/apply/approve', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ applyId, auditRemark: remark }),
+        });
+        const data = await res.json();
+        alert(data.message || data.detail);
+        loadList();
+      }
+
+      async function rejectApply(applyId) {
+        const reason = prompt('请输入驳回原因（必填）') || '';
+        if (!reason.trim()) {
+          alert('驳回原因不能为空');
+          return;
+        }
+        const res = await fetch('/api/admin/provider/apply/reject', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ applyId, rejectReason: reason }),
+        });
+        const data = await res.json();
+        alert(data.message || data.detail);
+        loadList();
+      }
+
+      window.viewDetail = viewDetail;
+      window.approve = approve;
+      window.rejectApply = rejectApply;
       loadList();
     </script>
   </body>

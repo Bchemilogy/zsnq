@@ -48,3 +48,16 @@ uv run --no-project python scripts/acceptance_check.py --base-url http://127.0.0
 - 服务方入驻审核页：`GET /operate/provider-audit`
 - 服务方入驻审核列表：`GET /api/admin/provider-onboard`（ADMIN/OPERATOR）
 - 服务方入驻审核动作：`POST /api/admin/provider-onboard/{id}/audit`（ADMIN/OPERATOR）
+
+## 第二个闭环（服务方入驻）关键接口
+
+- `GET  /api/provider/apply/status`
+- `POST /api/provider/apply/submit`
+- `GET  /api/provider/apply/detail`
+- `POST /api/provider/apply/resubmit`
+- `GET  /api/provider/workbench`
+- `GET  /api/admin/provider/apply/list`
+- `GET  /api/admin/provider/apply/detail`
+- `POST /api/admin/provider/apply/approve`
+- `POST /api/admin/provider/apply/reject`
+- `POST /api/file/upload`

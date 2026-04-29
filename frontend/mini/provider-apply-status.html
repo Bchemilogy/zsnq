@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title>审核状态</title></head>
+  <body>
+    <h1>入驻审核状态</h1>
+    <p id="status"></p>
+    <p><a href="/mini/provider-onboard">返回申请页</a></p>
+    <script>
+      const token = localStorage.getItem('mini_token');
+      if (!token) location.href = '/mini/login';
+      async function load() {
+        const res = await fetch('/api/provider/apply/status', { headers: { Authorization: `Bearer ${token}` } });
+        const data = await res.json();
+        if (!res.ok) { document.getElementById('status').textContent = data.detail; return; }
+        document.getElementById('status').textContent = `当前状态：${data.auditStatus}`;
+        if (data.auditStatus === 'APPROVED') location.href = '/mini/provider-home';
+        if (data.auditStatus === 'REJECTED') location.href = '/mini/provider-apply-reject';
+      }
+      load();
+    </script>
+  </body>
+</html>

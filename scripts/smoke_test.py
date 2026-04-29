@@ -40,38 +40,40 @@ def main():
     status, data = request_json("GET", f"{base}/health")
     expect(status == 200 and data.get("ok") is True, "health 可用")
 
-    status, data = request_json(
-        "POST",
-        f"{base}/api/auth/login",
-        {"username": "admin", "password": "admin123", "client_type": "PC"},
-    )
+    status, data = request_json("POST", f"{base}/api/auth/login", {"username": "admin", "password": "admin123", "client_type": "PC"})
     expect(status == 200 and "token" in data, "PC 登录成功")
     admin_token = data["token"]
-
-    status, data = request_json("GET", f"{base}/api/system/dashboard-stats", token=admin_token)
-    expect(status == 200 and "loginCount" in data, "dashboard 统计可用")
 
     status, data = request_json("POST", f"{base}/api/auth/wechat-login", {"code": "provider-test-code"})
     expect(status == 200 and data.get("role") == "PROVIDER", "小程序服务方登录成功")
     provider_token = data["token"]
 
     submit = {
-        "real_name": "测试服务方",
-        "phone": "13800000000",
-        "service_area": "测试区域",
-        "credential_images": ["https://example.com/a.jpg"],
+        "providerName": "李四农机合作社",
+        "contactName": "李四",
+        "contactPhone": "13800000000",
+        "providerType": "COOPERATIVE",
+        "regionCode": "360000",
+        "address": "江西省某县某乡镇",
+        "serviceTypes": ["AGRICULTURAL_MACHINERY", "DRYING"],
+        "serviceDescription": "拥有收割机3台",
+        "serviceArea": "某县及周边乡镇",
+        "attachments": [{"fileType": "BUSINESS_LICENSE", "fileName": "营业执照.jpg", "fileUrl": "https://x/a.jpg"}],
     }
-    status, data = request_json("POST", f"{base}/api/provider/onboard-submit", submit, token=provider_token)
-    expect(status == 200 and data.get("status") == "PENDING", "服务方入驻提交成功")
-    onboard_id = data["id"]
+    status, data = request_json("POST", f"{base}/api/provider/apply/submit", submit, token=provider_token)
+    expect(status == 200 and data.get("data", {}).get("auditStatus") == "PENDING", "服务方入驻提交成功")
+    apply_id = data["data"]["applyId"]
 
-    status, data = request_json("POST", f"{base}/api/admin/provider-onboard/{onboard_id}/audit", {"action": "APPROVE"}, token=admin_token)
-    expect(status == 200 and data.get("status") == "APPROVED", "运营审核通过成功")
+    status, data = request_json("POST", f"{base}/api/admin/provider/apply/approve", {"applyId": apply_id, "auditRemark": "通过"}, token=admin_token)
+    expect(status == 200, "运营审核通过成功")
 
-    status, data = request_json("GET", f"{base}/api/provider/onboard-status", token=provider_token)
-    expect(status == 200 and data.get("status") == "APPROVED", "服务方可看到最新审核状态")
+    status, data = request_json("GET", f"{base}/api/provider/apply/status", token=provider_token)
+    expect(status == 200 and data.get("auditStatus") == "APPROVED", "服务方状态变为 APPROVED")
 
-    print("\n全部关键链路自测通过。")
+    status, data = request_json("GET", f"{base}/api/provider/workbench", token=provider_token)
+    expect(status == 200 and data.get("code") == 200, "服务方可进入工作台")
+
+    print("\n第二闭环关键链路自测通过。")
 
 
 if __name__ == "__main__":

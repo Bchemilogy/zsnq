@@ -249,6 +249,16 @@ def admin_login_log_page():
     return FileResponse(ADMIN_DIR / "login-log.html")
 
 
+@app.get("/admin/progress")
+def admin_progress_page():
+    return FileResponse(ADMIN_DIR / "progress.html")
+
+
+@app.get("/progress")
+def progress_page():
+    return FileResponse(ADMIN_DIR / "progress.html")
+
+
 @app.get("/system/user")
 def admin_user_page():
     return FileResponse(ADMIN_DIR / "user.html")
@@ -309,9 +319,21 @@ def mini_provider_apply_reject_page():
 def mini_farmer_demand_create_page():
     return FileResponse(MINI_DIR / "farmer-demand-create.html")
 
+@app.get("/mini/farmer-demand-list")
+def mini_farmer_demand_list_page():
+    return FileResponse(MINI_DIR / "farmer-demand-list.html")
+
+@app.get("/mini/farmer-demand-detail")
+def mini_farmer_demand_detail_page():
+    return FileResponse(MINI_DIR / "farmer-demand-detail.html")
+
 @app.get("/mini/provider-demand-list")
 def mini_provider_demand_list_page():
     return FileResponse(MINI_DIR / "provider-demand-list.html")
+
+@app.get("/mini/provider-record-create")
+def mini_provider_record_create_page():
+    return FileResponse(MINI_DIR / "provider-record-create.html")
 
 @app.get("/ops/demand")
 def admin_demand_page():
@@ -1173,3 +1195,58 @@ def admin_evidence_chain_detail(recordId: int, user=Depends(current_user)):
     evs = [x for x in SERVICE_EVIDENCES if x['recordId'] == recordId]
     logs = [x for x in SERVICE_DEMAND_LOGS if x['demandId'] == record['demandId']]
     return {'code': 200, 'data': {'demand': demand, 'record': record, 'evidences': evs, 'logs': logs}}
+
+
+@app.post('/api/farmer/demand/cancel')
+def farmer_demand_cancel(req: DemandActionRequest, user=Depends(current_user)):
+    if user['role'] != 'FARMER':
+        raise HTTPException(status_code=403, detail='仅农户可操作')
+    item = next((x for x in SERVICE_DEMANDS if x['id'] == req.demandId and x['farmerUserId'] == user['user_id']), None)
+    if not item:
+        raise HTTPException(status_code=404, detail='需求不存在')
+    if item['status'] not in {'SUBMITTED','CONTACTED'}:
+        raise HTTPException(status_code=400, detail='当前状态不可取消')
+    before=item['status'];item['status']='CANCELLED';item['cancelTime']=datetime.now(timezone.utc).isoformat()
+    _append_demand_log(item['id'], user, before, 'CANCELLED', 'CANCEL')
+    return {'code':200,'message':'已取消'}
+
+@app.get('/api/provider/demand/detail')
+def provider_demand_detail(id: int, user=Depends(current_user)):
+    provider=_provider_guard(user)
+    item=next((x for x in SERVICE_DEMANDS if x['id']==id and x['providerId']==provider['providerId']),None)
+    if not item: raise HTTPException(status_code=404, detail='需求不存在')
+    return {'code':200,'data':item}
+
+@app.get('/api/provider/service-record/list')
+def provider_record_list(user=Depends(current_user)):
+    provider=_provider_guard(user)
+    return {'code':200,'data':[x for x in SERVICE_RECORDS if x['providerId']==provider['providerId']]}
+
+@app.get('/api/provider/service-record/detail')
+def provider_record_detail(id:int,user=Depends(current_user)):
+    provider=_provider_guard(user)
+    item=next((x for x in SERVICE_RECORDS if x['id']==id and x['providerId']==provider['providerId']),None)
+    if not item: raise HTTPException(status_code=404, detail='服务记录不存在')
+    evs=[x for x in SERVICE_EVIDENCES if x['recordId']==id]
+    return {'code':200,'data':{'record':item,'evidences':evs}}
+
+@app.get('/api/admin/demand/detail')
+def admin_demand_detail(id:int,user=Depends(current_user)):
+    if user['role'] not in {'ADMIN','OPERATOR','GOV_ADMIN'}: raise HTTPException(status_code=403, detail='无权限')
+    item=next((x for x in SERVICE_DEMANDS if x['id']==id),None)
+    if not item: raise HTTPException(status_code=404, detail='需求不存在')
+    return {'code':200,'data':item}
+
+@app.get('/api/admin/service-record/detail')
+def admin_service_record_detail(id:int,user=Depends(current_user)):
+    if user['role'] not in {'ADMIN','OPERATOR','GOV_ADMIN'}: raise HTTPException(status_code=403, detail='无权限')
+    item=next((x for x in SERVICE_RECORDS if x['id']==id),None)
+    if not item: raise HTTPException(status_code=404, detail='服务记录不存在')
+    return {'code':200,'data':item}
+
+@app.get('/api/admin/evidence/list')
+def admin_evidence_list(recordId:int=0,user=Depends(current_user)):
+    if user['role'] not in {'ADMIN','OPERATOR','GOV_ADMIN'}: raise HTTPException(status_code=403, detail='无权限')
+    items=SERVICE_EVIDENCES
+    if recordId: items=[x for x in items if x['recordId']==recordId]
+    return {'code':200,'data':items}

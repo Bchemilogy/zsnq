@@ -407,16 +407,15 @@ def login(req: LoginRequest):
 
 @app.post("/api/auth/provider-phone-login")
 def auth_provider_phone_login(req: ProviderPhoneLoginRequest):
-    provider = next((x for x in PROVIDERS if x.get("contactPhone") == req.contactPhone), None)
-    if not provider:
+    apply = next((x for x in reversed(PROVIDER_APPLIES) if x.get("contactPhone") == req.contactPhone), None)
+    if not apply:
         raise HTTPException(status_code=404, detail="联系电话未找到对应服务方")
-    latest = _latest_apply_by_user(provider.get("userId", 0))
-    if not latest or latest.get("auditStatus") != "APPROVED":
+    if apply.get("auditStatus") != "APPROVED":
         raise HTTPException(status_code=403, detail="服务方未通过审核")
-    user = next((u for u in USERS.values() if u["id"] == provider.get("userId")), None)
+    user = next((u for u in USERS.values() if u["id"] == apply.get("userId")), None)
     if not user:
         raise HTTPException(status_code=404, detail="服务方账号不存在")
-    token = _create_token(user)
+    token = _create_token(user, "MINI")
     return {"token": token, "role": user["role"], "username": user["username"]}
 
 @app.post("/api/auth/wechat-login")

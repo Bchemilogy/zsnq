@@ -19,7 +19,6 @@
         if (!res.ok) { document.getElementById('status').textContent = data.detail; return; }
         document.getElementById('status').textContent = `当前状态：${map[data.auditStatus] || data.auditStatus}`;
         document.getElementById('detail').textContent = `状态码：${data.auditStatus}`;
-        if (data.auditStatus === 'APPROVED') location.href = '/mini/provider-home';
         if (data.auditStatus === 'REJECTED') location.href = '/mini/provider-apply-reject';
       }
       load();

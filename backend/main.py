@@ -223,6 +223,11 @@ def health():
 app.mount("/admin-static", StaticFiles(directory=ADMIN_DIR), name="admin-static")
 
 
+@app.get("/theme.css")
+def theme_css():
+    return FileResponse(BASE_DIR / "frontend" / "theme.css")
+
+
 @app.get("/admin")
 def admin_login_page():
     return FileResponse(ADMIN_DIR / "index.html")

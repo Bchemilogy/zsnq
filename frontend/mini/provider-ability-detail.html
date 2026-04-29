@@ -1,4 +1,4 @@
-<!doctype html><html lang='zh-CN'><head><meta charset='UTF-8'/><meta name='viewport' content='width=device-width,initial-scale=1.0'/><title>服务能力详情</title></head><body><h1>服务能力详情</h1><p><a href='/mini/provider-ability-list'>返回我的能力</a></p><p>请在地址栏追加 <code>?id=能力ID</code> 查看详情。</p><p id='msg'></p><pre id='detail'></pre><script>
+<!doctype html><html lang='zh-CN'><head><meta charset='UTF-8'/><meta name='viewport' content='width=device-width,initial-scale=1.0'/><title>服务能力详情</title><link rel='stylesheet' href='/theme.css'/></head><body><div class="banner">农服数字平台</div><h1>服务能力详情</h1><p><a href='/mini/provider-ability-list'>返回我的能力</a></p><p>请在地址栏追加 <code>?id=能力ID</code> 查看详情。</p><p id='msg'></p><pre id='detail'></pre><script>
 const t=localStorage.getItem('mini_token');if(!t)location.href='/mini/login';
 const q=new URLSearchParams(location.search);const id=q.get('id');
 if(!id){msg.textContent='缺少能力ID';}

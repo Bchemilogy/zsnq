@@ -1,6 +1,6 @@
-<!doctype html><html lang="zh-CN"><head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title>菜单管理</title>
+<!doctype html><html lang="zh-CN"><head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title>菜单管理</title><link rel='stylesheet' href='/theme.css'/>
 <style>body{font-family:Arial,'Microsoft YaHei';background:#f8fafc;margin:0}.wrap{max-width:920px;margin:20px auto;padding:0 12px}.card{background:#fff;padding:16px;border-radius:12px;box-shadow:0 8px 24px rgba(15,23,42,.08)}table{width:100%;border-collapse:collapse}th,td{border:1px solid #e2e8f0;padding:8px}th{background:#f1f5f9}</style></head>
-<body><div class="wrap"><div class="card"><h1>菜单管理</h1><p><a href="/dashboard">返回首页</a></p><p id="msg"></p><table><thead><tr><th>角色</th><th>菜单名称</th><th>路径</th></tr></thead><tbody id="rows"></tbody></table></div></div>
+<body><div class="banner">农服数字平台</div><div class="wrap"><div class="card"><h1>菜单管理</h1><p><a href="/dashboard">返回首页</a></p><p id="msg"></p><table><thead><tr><th>角色</th><th>菜单名称</th><th>路径</th></tr></thead><tbody id="rows"></tbody></table></div></div>
 <script>
 const token=localStorage.getItem('token');if(!token)location.href='/admin';
 (async()=>{const res=await fetch('/api/system/menu',{headers:{Authorization:`Bearer ${token}`}});const data=await res.json();if(!res.ok){document.getElementById('msg').textContent=data.detail||'加载失败';return;}document.getElementById('msg').textContent=`共 ${data.items.length} 条`;const rows=document.getElementById('rows');rows.innerHTML='';data.items.forEach((item)=>{const tr=document.createElement('tr');tr.innerHTML=`<td>${item.role}</td><td>${item.name}</td><td>${item.path}</td>`;rows.appendChild(tr);});})();

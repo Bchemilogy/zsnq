@@ -1,4 +1,4 @@
-<!doctype html><html lang='zh-CN'><head><meta charset='UTF-8'/><meta name='viewport' content='width=device-width,initial-scale=1.0'/><title>联系记录</title></head><body><h1>联系记录</h1><p><a href='/dashboard'>返回首页</a></p><h3>统计</h3><pre id='stat'></pre><h3>列表</h3><pre id='list'></pre><script>
+<!doctype html><html lang='zh-CN'><head><meta charset='UTF-8'/><meta name='viewport' content='width=device-width,initial-scale=1.0'/><title>联系记录</title><link rel='stylesheet' href='/theme.css'/></head><body><div class="banner">农服数字平台</div><h1>联系记录</h1><p><a href='/dashboard'>返回首页</a></p><h3>统计</h3><pre id='stat'></pre><h3>列表</h3><pre id='list'></pre><script>
 const t=localStorage.getItem('token');if(!t)location.href='/admin';
 (async()=>{const s=await fetch('/api/admin/contact-log/stat',{headers:{Authorization:`Bearer ${t}`}});const sd=await s.json();stat.textContent=JSON.stringify(sd.data||sd,null,2);const r=await fetch('/api/admin/contact-log/list',{headers:{Authorization:`Bearer ${t}`}});const d=await r.json();list.textContent=JSON.stringify(d.data||d,null,2);})();
 </script></body></html>

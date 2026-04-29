@@ -37,7 +37,15 @@
           </div>
           <div class="row1">
             <label>详细地址<input id="address" required /></label>
-            <label>服务类型（逗号分隔）<input id="serviceTypes" value="AGRICULTURAL_MACHINERY,DRYING" required /></label>
+            <label>服务类型（可多选）</label>
+            <div id="serviceTypes" style="display:grid;grid-template-columns:repeat(3,minmax(100px,1fr));gap:8px;margin-bottom:10px">
+              <label><input type="checkbox" value="AGRICULTURAL_MACHINERY" checked /> 农机服务</label>
+              <label><input type="checkbox" value="SEEDLING" /> 育秧服务</label>
+              <label><input type="checkbox" value="DRYING" checked /> 烘干服务</label>
+              <label><input type="checkbox" value="STORAGE" /> 仓储服务</label>
+              <label><input type="checkbox" value="PLANTING_GUIDANCE" /> 种植指导</label>
+              <label><input type="checkbox" value="OTHER" /> 其他服务</label>
+            </div>
             <label>服务能力说明<textarea id="serviceDescription" rows="3"></textarea></label>
           </div>
 
@@ -103,7 +111,7 @@
           providerType: document.getElementById('providerType').value,
           regionCode: document.getElementById('regionCode').value,
           address: document.getElementById('address').value,
-          serviceTypes: document.getElementById('serviceTypes').value.split(',').map((x) => x.trim()).filter(Boolean),
+          serviceTypes: Array.from(document.querySelectorAll('#serviceTypes input[type=\"checkbox\"]:checked')).map((x) => x.value),
           serviceDescription: document.getElementById('serviceDescription').value,
           serviceArea: document.getElementById('serviceArea').value,
           attachments,

@@ -6,6 +6,7 @@ from uuid import uuid4
 from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import Response
 from pydantic import BaseModel
 
 app = FastAPI(title="智枢农擎最小后端")
@@ -68,6 +69,17 @@ class FileUploadRequest(BaseModel):
     fileSize: int = 0
 
 
+class UserUpsertRequest(BaseModel):
+    username: str
+    password: str = "123456"
+    role: str
+
+
+class RoleUpsertRequest(BaseModel):
+    code: str
+    name: str
+
+
 USERS = {
     "admin": {"id": 1, "username": "admin", "password": "admin123", "role": "ADMIN"},
     "operator": {"id": 2, "username": "operator", "password": "op123", "role": "OPERATOR"},
@@ -115,6 +127,7 @@ PROVIDER_ONBOARDS: list[dict] = []
 PROVIDER_APPLIES: list[dict] = []
 PROVIDERS: list[dict] = []
 PROVIDER_AUDIT_LOGS: list[dict] = []
+UPLOADED_FILES: dict[str, dict] = {}
 
 
 def _menus_by_role(role: str) -> list[dict]:
@@ -309,11 +322,86 @@ def user_list(user=Depends(current_user)):
     return {"items": items}
 
 
+@app.post("/api/system/user")
+def user_create(req: UserUpsertRequest, user=Depends(current_user)):
+    if user["role"] != "ADMIN":
+        raise HTTPException(status_code=403, detail="无权限")
+    if req.username in USERS:
+        raise HTTPException(status_code=400, detail="用户名已存在")
+    new_id = max(u["id"] for u in USERS.values()) + 1 if USERS else 1
+    USERS[req.username] = {"id": new_id, "username": req.username, "password": req.password, "role": req.role}
+    return {"message": "新增成功"}
+
+
+@app.put("/api/system/user/{username}")
+def user_update(username: str, req: UserUpsertRequest, user=Depends(current_user)):
+    if user["role"] != "ADMIN":
+        raise HTTPException(status_code=403, detail="无权限")
+    target = USERS.get(username)
+    if not target:
+        raise HTTPException(status_code=404, detail="用户不存在")
+    target["password"] = req.password
+    target["role"] = req.role
+    return {"message": "修改成功"}
+
+
+@app.delete("/api/system/user/{username}")
+def user_delete(username: str, user=Depends(current_user)):
+    if user["role"] != "ADMIN":
+        raise HTTPException(status_code=403, detail="无权限")
+    if username == "admin":
+        raise HTTPException(status_code=400, detail="admin 不可删除")
+    if username not in USERS:
+        raise HTTPException(status_code=404, detail="用户不存在")
+    USERS.pop(username)
+    return {"message": "删除成功"}
+
+
 @app.get("/api/system/role")
 def role_list(user=Depends(current_user)):
     if user["role"] != "ADMIN":
         raise HTTPException(status_code=403, detail="无权限")
     return {"items": ROLE_LIST}
+
+
+@app.post("/api/system/role")
+def role_create(req: RoleUpsertRequest, user=Depends(current_user)):
+    if user["role"] != "ADMIN":
+        raise HTTPException(status_code=403, detail="无权限")
+    if any(x["code"] == req.code for x in ROLE_LIST):
+        raise HTTPException(status_code=400, detail="角色编码已存在")
+    ROLE_LIST.append({"code": req.code, "name": req.name})
+    if req.code not in MENU_LIST:
+        MENU_LIST[req.code] = [{"path": "/dashboard", "name": "首页"}]
+    return {"message": "新增成功"}
+
+
+@app.put("/api/system/role/{code}")
+def role_update(code: str, req: RoleUpsertRequest, user=Depends(current_user)):
+    if user["role"] != "ADMIN":
+        raise HTTPException(status_code=403, detail="无权限")
+    target = next((x for x in ROLE_LIST if x["code"] == code), None)
+    if not target:
+        raise HTTPException(status_code=404, detail="角色不存在")
+    target["name"] = req.name
+    return {"message": "修改成功"}
+
+
+@app.delete("/api/system/role/{code}")
+def role_delete(code: str, user=Depends(current_user)):
+    if user["role"] != "ADMIN":
+        raise HTTPException(status_code=403, detail="无权限")
+    if code in {"ADMIN", "OPERATOR", "FARMER", "PROVIDER"}:
+        raise HTTPException(status_code=400, detail="内置角色不可删除")
+    idx = next((i for i, x in enumerate(ROLE_LIST) if x["code"] == code), -1)
+    if idx < 0:
+        raise HTTPException(status_code=404, detail="角色不存在")
+    ROLE_LIST.pop(idx)
+    MENU_LIST.pop(code, None)
+    for u in USERS.values():
+        if u["role"] == code:
+            u["role"] = "OPERATOR"
+    return {"message": "删除成功"}
 
 
 @app.get("/api/system/menu")
@@ -597,12 +685,32 @@ async def file_upload(
     if ext not in {"jpg", "jpeg", "png", "pdf"}:
         raise HTTPException(status_code=400, detail="仅支持 jpg/jpeg/png/pdf")
     content = await file.read()
+    file_id = uuid4().hex
+    UPLOADED_FILES[file_id] = {
+        "content": content,
+        "fileName": file.filename,
+        "fileType": ext,
+    }
     return {
         "code": 200,
         "data": {
             "fileName": file.filename,
-            "fileUrl": f"https://mock-files.local/{uuid4().hex}_{file.filename}",
+            "fileUrl": f"/api/file/download/{file_id}",
             "fileSize": len(content),
             "fileType": ext,
+            "fileId": file_id,
         },
     }
+
+
+@app.get("/api/file/download/{file_id}")
+def file_download(file_id: str, user=Depends(current_user)):
+    target = UPLOADED_FILES.get(file_id)
+    if not target:
+        raise HTTPException(status_code=404, detail="文件不存在")
+    content_type = "application/pdf" if target["fileType"] == "pdf" else f"image/{'jpeg' if target['fileType'] == 'jpg' else target['fileType']}"
+    return Response(
+        content=target["content"],
+        media_type=content_type,
+        headers={"Content-Disposition": f"inline; filename*=UTF-8''{target['fileName']}"},
+    )

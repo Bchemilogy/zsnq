@@ -17,6 +17,7 @@
       <p><a href="/dashboard">返回首页</a></p>
       <p id="user"></p>
       <p id="msg"></p>
+      <pre id="detail" style="background:#f8fafc;border:1px solid #e2e8f0;padding:10px;border-radius:8px;white-space:pre-wrap"></pre>
       <table>
         <thead><tr><th>申请ID</th><th>服务方名称</th><th>联系人</th><th>电话</th><th>状态</th><th>提交时间</th><th>操作</th></tr></thead>
         <tbody id="rows"></tbody>
@@ -59,7 +60,14 @@
         const res = await fetch(`/api/admin/provider/apply/detail?applyId=${applyId}`, { headers: { Authorization: `Bearer ${token}` } });
         const data = await res.json();
         if (!res.ok) { alert(data.detail || '失败'); return; }
-        alert(`申请详情:\n${JSON.stringify(data.data.apply, null, 2)}\n\n审核日志:\n${JSON.stringify(data.data.auditLogs, null, 2)}`);
+        const apply = data.data.apply;
+        const logs = data.data.auditLogs || [];
+        const attachments = apply.attachments || [];
+        const fileLines = attachments.length
+          ? attachments.map((f, i) => `${i + 1}. ${f.fileType} | ${f.fileName} | ${f.fileUrl}`).join('\\n')
+          : '无附件';
+        document.getElementById('detail').textContent =
+          `申请详情\\n${JSON.stringify(apply, null, 2)}\\n\\n附件（可复制链接在浏览器打开/下载）\\n${fileLines}\\n\\n审核日志\\n${JSON.stringify(logs, null, 2)}`;
       }
 
       async function approve(applyId) {

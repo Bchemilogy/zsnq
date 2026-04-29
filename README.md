@@ -6,6 +6,33 @@
 uv run uvicorn backend.main:app --reload
 ```
 
+### Windows 常见问题：`python-multipart` 已安装但仍报缺失
+
+如果你在 PowerShell 里执行过：
+
+```bash
+pip install python-multipart
+```
+
+仍然在 `uv run uvicorn ...` 时提示缺少 `python-multipart`，通常是因为：
+
+- `pip` 装到了系统 Python（例如 Python312）
+- 但 `uv run` 使用的是项目 `.venv`（可能是 Python 3.11）
+
+请在项目目录执行（确保装到 `.venv`）：
+
+```bash
+uv pip install python-multipart
+```
+
+如仍有缓存问题，建议重建虚拟环境后再启动：
+
+```bash
+rm -rf .venv
+uv sync
+uv run uvicorn backend.main:app --reload
+```
+
 ## 自测脚本（关键链路）
 
 先启动服务，再执行：

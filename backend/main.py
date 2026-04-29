@@ -163,6 +163,7 @@ MENU_LIST["OPERATOR"] += [
 WECHAT_CODE_USER = {
     "farmer-test-code": {"id": 101, "username": "farmer_01", "role": "FARMER", "openid": "openid_farmer_01"},
     "provider-test-code": {"id": 201, "username": "provider_01", "role": "PROVIDER", "openid": "openid_provider_01"},
+    "provider-new-test-code": {"id": 202, "username": "provider_02", "role": "PROVIDER", "openid": "openid_provider_02"},
 }
 
 # token -> 用户上下文（最小实现，内存态）
@@ -277,6 +278,10 @@ def admin_menu_page():
 @app.get("/mini/login")
 def mini_login_page():
     return FileResponse(MINI_DIR / "login.html")
+
+@app.get("/mini/provider-login")
+def mini_provider_login_page():
+    return FileResponse(MINI_DIR / "provider-login.html")
 
 
 @app.get("/mini/bind-phone")

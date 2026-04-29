@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Literal
 from uuid import uuid4
 
-from fastapi import Depends, FastAPI, Header, HTTPException
+from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -588,16 +588,21 @@ def admin_provider_detail(providerId: int, user=Depends(current_user)):
 
 
 @app.post("/api/file/upload")
-def file_upload(req: FileUploadRequest, user=Depends(current_user)):
-    ext = req.fileType.lower()
+async def file_upload(
+    file: UploadFile = File(...),
+    fileType: str = Form(default=""),
+    user=Depends(current_user),
+):
+    ext = (fileType or file.filename.rsplit(".", 1)[-1]).lower()
     if ext not in {"jpg", "jpeg", "png", "pdf"}:
         raise HTTPException(status_code=400, detail="仅支持 jpg/jpeg/png/pdf")
+    content = await file.read()
     return {
         "code": 200,
         "data": {
-            "fileName": req.fileName,
-            "fileUrl": f"https://mock-files.local/{uuid4().hex}_{req.fileName}",
-            "fileSize": req.fileSize,
+            "fileName": file.filename,
+            "fileUrl": f"https://mock-files.local/{uuid4().hex}_{file.filename}",
+            "fileSize": len(content),
             "fileType": ext,
         },
     }

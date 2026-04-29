@@ -5,69 +5,71 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>服务方入驻申请</title>
     <style>
-      body { font-family: Arial, 'Microsoft YaHei', sans-serif; max-width: 760px; margin: 20px auto; padding: 0 12px; }
-      input, textarea, select { width: 100%; padding: 8px; margin-top: 4px; margin-bottom: 10px; }
-      button { padding: 8px 12px; margin-right: 8px; }
-      .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-      .hint { color: #475569; font-size: 13px; }
+      body{font-family:Arial,'Microsoft YaHei',sans-serif;background:#f1f5f9;margin:0}
+      .wrap{max-width:860px;margin:24px auto;padding:0 12px}
+      .card{background:#fff;border-radius:14px;box-shadow:0 10px 28px rgba(15,23,42,.1);padding:18px}
+      .row{display:grid;grid-template-columns:1fr 1fr;gap:12px}.row1{display:grid;grid-template-columns:1fr;gap:12px}
+      input,textarea,select{width:100%;padding:9px;border:1px solid #cbd5e1;border-radius:8px}
+      .btn{padding:10px 14px;border:0;border-radius:8px;color:#fff;cursor:pointer}
+      .b1{background:#2563eb}.b2{background:#0ea5e9}.b3{background:#f59e0b}
+      .msg{min-height:20px;color:#b91c1c}
     </style>
   </head>
   <body>
-    <h1>服务方入驻申请</h1>
-    <p><a href="/mini/login">返回登录页</a></p>
-    <p class="hint">第一版：先提交基础信息 + 附件 URL。</p>
+    <div class="wrap">
+      <div class="card">
+        <h1>服务方入驻申请</h1>
+        <p><a href="/mini/login">返回登录页</a> | <a href="/mini/provider-apply-status">查看审核状态</a></p>
+        <form id="form">
+          <div class="row">
+            <label>主体名称<input id="providerName" required /></label>
+            <label>联系人<input id="contactName" required /></label>
+          </div>
+          <div class="row">
+            <label>联系电话<input id="contactPhone" required value="13800000000" /></label>
+            <label>服务方类型
+              <select id="providerType"><option value="PERSONAL">个人</option><option value="COOPERATIVE">合作社</option><option value="ENTERPRISE">企业</option><option value="BIG_FARM">种植大户</option></select>
+            </label>
+          </div>
+          <div class="row">
+            <label>区域编码<input id="regionCode" value="360000" /></label>
+            <label>服务区域<input id="serviceArea" required /></label>
+          </div>
+          <div class="row1">
+            <label>详细地址<input id="address" required /></label>
+            <label>服务类型（逗号分隔）<input id="serviceTypes" value="AGRICULTURAL_MACHINERY,DRYING" required /></label>
+            <label>服务能力说明<textarea id="serviceDescription" rows="3"></textarea></label>
+          </div>
 
-    <form id="form">
-      <div class="row">
-        <label>主体名称<input id="providerName" required /></label>
-        <label>联系人<input id="contactName" required /></label>
+          <h3>附件上传（真实文件上传到后端模拟存储）</h3>
+          <div class="row">
+            <label>营业执照<input id="licenseFile" type="file" accept=".jpg,.jpeg,.png,.pdf" /></label>
+            <label>设备照片<input id="deviceFile" type="file" accept=".jpg,.jpeg,.png" /></label>
+          </div>
+          <p>
+            <button class="btn b2" type="button" id="uploadFiles">先上传附件</button>
+            <button class="btn b1" type="submit">提交入驻申请</button>
+            <button class="btn b3" type="button" id="resubmit">驳回后重提</button>
+          </p>
+          <p id="uploadMsg"></p>
+          <p class="msg" id="msg"></p>
+        </form>
       </div>
-      <div class="row">
-        <label>联系电话<input id="contactPhone" required /></label>
-        <label>服务方类型
-          <select id="providerType">
-            <option value="PERSONAL">个人</option>
-            <option value="COOPERATIVE">合作社</option>
-            <option value="ENTERPRISE">企业</option>
-            <option value="BIG_FARM">种植大户</option>
-          </select>
-        </label>
-      </div>
-      <div class="row">
-        <label>区域编码<input id="regionCode" value="360000" /></label>
-        <label>服务区域<input id="serviceArea" required /></label>
-      </div>
-      <label>详细地址<input id="address" required /></label>
-      <label>服务类型（逗号分隔）<input id="serviceTypes" value="AGRICULTURAL_MACHINERY,DRYING" required /></label>
-      <label>服务能力说明<textarea id="serviceDescription" rows="3"></textarea></label>
-
-      <h3>附件（模拟上传）</h3>
-      <div class="row">
-        <label>营业执照文件名<input id="licenseFile" value="营业执照.jpg" /></label>
-        <label>设备照片文件名<input id="deviceFile" value="设备照片.jpg" /></label>
-      </div>
-      <button type="button" id="uploadFiles">先上传附件</button>
-      <span id="uploadMsg"></span>
-
-      <div style="margin-top: 12px">
-        <button type="submit">提交入驻申请</button>
-        <button type="button" id="resubmit">驳回后重提</button>
-      </div>
-    </form>
-
-    <p id="msg"></p>
+    </div>
 
     <script>
       const token = localStorage.getItem('mini_token');
       if (!token) location.href = '/mini/login';
-
       let attachments = [];
 
-      async function uploadOne(fileName, fileType, fileTag) {
+      async function uploadOne(file, fileTag) {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('fileType', (file.name.split('.').pop() || '').toLowerCase());
         const res = await fetch('/api/file/upload', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ fileName, fileType, fileSize: 1024 }),
+          headers: { Authorization: `Bearer ${token}` },
+          body: formData,
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.detail || '上传失败');
@@ -78,10 +80,16 @@
         const uploadMsg = document.getElementById('uploadMsg');
         uploadMsg.textContent = '上传中...';
         try {
-          const license = await uploadOne(document.getElementById('licenseFile').value, 'jpg', 'BUSINESS_LICENSE');
-          const device = await uploadOne(document.getElementById('deviceFile').value, 'jpg', 'DEVICE_PHOTO');
+          const licenseFile = document.getElementById('licenseFile').files[0];
+          const deviceFile = document.getElementById('deviceFile').files[0];
+          if (!licenseFile || !deviceFile) {
+            uploadMsg.textContent = '请先选择营业执照和设备照片文件';
+            return;
+          }
+          const license = await uploadOne(licenseFile, 'BUSINESS_LICENSE');
+          const device = await uploadOne(deviceFile, 'DEVICE_PHOTO');
           attachments = [license, device];
-          uploadMsg.textContent = '上传成功';
+          uploadMsg.textContent = `上传成功，共 ${attachments.length} 个附件`; 
         } catch (e) {
           uploadMsg.textContent = e.message;
         }
@@ -102,28 +110,19 @@
         };
       }
 
-      document.getElementById('form').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const res = await fetch('/api/provider/apply/submit', {
+      async function submitTo(url) {
+        const res = await fetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
           body: JSON.stringify(buildPayload()),
         });
         const data = await res.json();
-        document.getElementById('msg').textContent = res.ok ? data.message : data.detail;
+        document.getElementById('msg').textContent = res.ok ? `${data.message}（状态=${data.data.auditStatus}）` : data.detail;
         if (res.ok) location.href = '/mini/provider-apply-status';
-      });
+      }
 
-      document.getElementById('resubmit').addEventListener('click', async () => {
-        const res = await fetch('/api/provider/apply/resubmit', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-          body: JSON.stringify(buildPayload()),
-        });
-        const data = await res.json();
-        document.getElementById('msg').textContent = res.ok ? data.message : data.detail;
-        if (res.ok) location.href = '/mini/provider-apply-status';
-      });
+      document.getElementById('form').addEventListener('submit', async (e) => { e.preventDefault(); submitTo('/api/provider/apply/submit'); });
+      document.getElementById('resubmit').addEventListener('click', async () => submitTo('/api/provider/apply/resubmit'));
     </script>
   </body>
 </html>

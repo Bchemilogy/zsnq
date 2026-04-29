@@ -18,7 +18,7 @@
         const data = await res.json();
         if (!res.ok) { document.getElementById('status').textContent = data.detail; return; }
         document.getElementById('status').textContent = `当前状态：${map[data.auditStatus] || data.auditStatus}`;
-        document.getElementById('detail').textContent = `状态码：${data.auditStatus}`;
+        document.getElementById('detail').textContent = '请耐心等待审核结果';
         if (data.auditStatus === 'REJECTED') location.href = '/mini/provider-apply-reject';
       }
       load();

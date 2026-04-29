@@ -125,7 +125,8 @@
           body: JSON.stringify(buildPayload()),
         });
         const data = await res.json();
-        document.getElementById('msg').textContent = res.ok ? `${data.message}（状态=${data.data.auditStatus}）` : data.detail;
+        if(res.ok){alert(`${data.message}`);}else{alert(data.detail||'提交失败');}
+        document.getElementById('msg').textContent = res.ok ? `${data.message}` : data.detail;
         if (res.ok) location.href = '/mini/provider-apply-status';
       }
 

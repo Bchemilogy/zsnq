@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Literal
 from uuid import uuid4
+import re
 
 from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, UploadFile
 from fastapi.responses import FileResponse
@@ -407,11 +408,14 @@ def login(req: LoginRequest):
 
 @app.post("/api/auth/provider-phone-login")
 def auth_provider_phone_login(req: ProviderPhoneLoginRequest):
-    apply = next((x for x in reversed(PROVIDER_APPLIES) if x.get("contactPhone") == req.contactPhone), None)
-    if not apply:
-        raise HTTPException(status_code=404, detail="联系电话未找到对应服务方")
-    if apply.get("auditStatus") != "APPROVED":
+    phone = (req.contactPhone or '').strip()
+    applies = [x for x in PROVIDER_APPLIES if (x.get("contactPhone") or '').strip() == phone]
+    if not applies:
+        raise HTTPException(status_code=404, detail="手机号未找到对应服务方")
+    approved_items = [x for x in applies if x.get("auditStatus") == "APPROVED"]
+    if not approved_items:
         raise HTTPException(status_code=403, detail="服务方未通过审核")
+    apply = approved_items[-1]
     user = next((u for u in USERS.values() if u["id"] == apply.get("userId")), None)
     if not user:
         raise HTTPException(status_code=404, detail="服务方账号不存在")
@@ -629,6 +633,14 @@ def admin_provider_onboard_audit(onboard_id: int, req: ProviderOnboardAuditReque
     return {"id": target["id"], "status": target["status"]}
 
 
+
+def _validate_phone_unique(phone: str, current_user_id: int | None = None):
+    if not re.fullmatch(r"1\d{10}", (phone or '').strip()):
+        raise HTTPException(status_code=400, detail="手机号格式不正确")
+    for x in PROVIDER_APPLIES:
+        if (x.get("contactPhone") or '').strip() == phone.strip() and x.get("userId") != current_user_id:
+            raise HTTPException(status_code=400, detail="该手机号已被其他服务方使用")
+
 def _latest_apply_by_user(user_id: int) -> dict | None:
     items = [x for x in PROVIDER_APPLIES if x["userId"] == user_id]
     return items[-1] if items else None
@@ -648,6 +660,7 @@ def provider_apply_status(user=Depends(current_user)):
 def provider_apply_submit(req: ProviderApplySubmitRequest, user=Depends(current_user)):
     if user["role"] != "PROVIDER":
         raise HTTPException(status_code=403, detail="仅服务方可提交入驻")
+    _validate_phone_unique(req.contactPhone, user["user_id"])
     apply_id = len(PROVIDER_APPLIES) + 10001
     now = datetime.now(timezone.utc).isoformat()
     record = {
@@ -691,6 +704,7 @@ def provider_apply_resubmit(req: ProviderApplySubmitRequest, user=Depends(curren
     latest = _latest_apply_by_user(user["user_id"])
     if not latest or latest["auditStatus"] != "REJECTED":
         raise HTTPException(status_code=400, detail="仅驳回状态可重提")
+    _validate_phone_unique(req.contactPhone, user["user_id"])
     latest.update(
         {
             "providerName": req.providerName,

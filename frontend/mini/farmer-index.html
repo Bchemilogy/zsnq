@@ -1,0 +1,4 @@
+<!doctype html><html lang='zh-CN'><head><meta charset='UTF-8'/><meta name='viewport' content='width=device-width,initial-scale=1.0'/><title>农户找服务</title></head><body><h1>农户找服务</h1><p><a href='/mini/farmer-home'>返回农户首页</a></p><div id='cats'></div><script>
+const t=localStorage.getItem('mini_token');if(!t)location.href='/mini/login';
+(async()=>{const r=await fetch('/api/farmer/service/category/list',{headers:{Authorization:`Bearer ${t}`}});const d=await r.json();if(!r.ok){cats.textContent=d.detail;return;}cats.innerHTML=d.data.map(x=>`<p><a href='/mini/farmer-service-list?serviceType=${x.code}'>我要找${x.name}</a></p>`).join('');})();
+</script></body></html>

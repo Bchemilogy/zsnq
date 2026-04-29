@@ -88,3 +88,18 @@ uv run --no-project python scripts/acceptance_check.py --base-url http://127.0.0
 - `POST /api/admin/provider/apply/approve`
 - `POST /api/admin/provider/apply/reject`
 - `POST /api/file/upload`
+
+## 第三个闭环（农户找服务）关键接口
+
+- `GET  /api/provider/ability/list`
+- `POST /api/provider/ability/create`
+- `POST /api/provider/ability/update`
+- `POST /api/provider/ability/enable`
+- `POST /api/provider/ability/disable`
+- `GET  /api/provider/ability/detail`
+- `GET  /api/farmer/service/category/list`
+- `GET  /api/farmer/provider/list`
+- `GET  /api/farmer/provider/detail`
+- `POST /api/farmer/contact-log/create`
+- `GET  /api/admin/service-ability/list`
+- `GET  /api/admin/contact-log/list`

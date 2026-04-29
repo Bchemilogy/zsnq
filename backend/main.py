@@ -80,6 +80,35 @@ class RoleUpsertRequest(BaseModel):
     name: str
 
 
+class AbilityUpsertRequest(BaseModel):
+    id: int | None = None
+    serviceType: str
+    abilityName: str
+    abilityDesc: str
+    serviceArea: str
+    regionCode: str = ""
+    address: str = ""
+    contactPhone: str = ""
+    wechatNo: str = ""
+    priceDesc: str = ""
+    equipmentName: str = ""
+    equipmentCount: int = 0
+    dailyCapacity: str = ""
+    availableStatus: str = "AVAILABLE"
+    imageUrls: list[str] = []
+
+
+class AbilitySwitchRequest(BaseModel):
+    id: int
+
+
+class ContactLogCreateRequest(BaseModel):
+    providerId: int
+    abilityId: int
+    contactType: Literal["PHONE", "WECHAT"]
+    sourcePage: str = "DETAIL"
+
+
 USERS = {
     "admin": {"id": 1, "username": "admin", "password": "admin123", "role": "ADMIN"},
     "operator": {"id": 2, "username": "operator", "password": "op123", "role": "OPERATOR"},
@@ -105,12 +134,24 @@ MENU_LIST = {
         {"path": "/system/login-log", "name": "登录日志"},
         {"path": "/operate/provider-audit", "name": "服务方入驻审核"},
     ],
-    "FARMER": [{"path": "/mini/farmer-home", "name": "农户测试首页"}],
+    "FARMER": [
+        {"path": "/mini/farmer-home", "name": "农户测试首页"},
+        {"path": "/mini/farmer-index", "name": "找服务"},
+    ],
     "PROVIDER": [
         {"path": "/mini/provider-home", "name": "服务方测试首页"},
         {"path": "/mini/provider-onboard", "name": "服务方入驻申请"},
+        {"path": "/mini/provider-ability-list", "name": "服务能力管理"},
     ],
 }
+MENU_LIST["ADMIN"] += [
+    {"path": "/ops/service-ability", "name": "服务能力管理"},
+    {"path": "/ops/contact-log", "name": "联系记录"},
+]
+MENU_LIST["OPERATOR"] += [
+    {"path": "/ops/service-ability", "name": "服务能力管理"},
+    {"path": "/ops/contact-log", "name": "联系记录"},
+]
 
 # 小程序测试用户映射：用 code 直接模拟绑定用户
 WECHAT_CODE_USER = {
@@ -128,6 +169,16 @@ PROVIDER_APPLIES: list[dict] = []
 PROVIDERS: list[dict] = []
 PROVIDER_AUDIT_LOGS: list[dict] = []
 UPLOADED_FILES: dict[str, dict] = {}
+SERVICE_CATEGORIES = [
+    {"code": "AGRICULTURAL_MACHINERY", "name": "农机服务"},
+    {"code": "SEEDLING", "name": "育秧服务"},
+    {"code": "DRYING", "name": "烘干服务"},
+    {"code": "STORAGE", "name": "仓储服务"},
+    {"code": "PLANTING_GUIDE", "name": "种植指导"},
+    {"code": "OTHER", "name": "其他服务"},
+]
+SERVICE_ABILITIES: list[dict] = []
+SERVICE_CONTACT_LOGS: list[dict] = []
 
 
 def _menus_by_role(role: str) -> list[dict]:
@@ -245,6 +296,41 @@ def mini_provider_apply_reject_page():
 @app.get("/operate/provider-audit")
 def admin_provider_audit_page():
     return FileResponse(ADMIN_DIR / "provider-audit.html")
+
+
+@app.get("/ops/service-ability")
+def admin_service_ability_page():
+    return FileResponse(ADMIN_DIR / "service-ability.html")
+
+
+@app.get("/ops/contact-log")
+def admin_contact_log_page():
+    return FileResponse(ADMIN_DIR / "contact-log.html")
+
+
+@app.get("/mini/farmer-index")
+def mini_farmer_index_page():
+    return FileResponse(MINI_DIR / "farmer-index.html")
+
+
+@app.get("/mini/farmer-service-list")
+def mini_farmer_service_list_page():
+    return FileResponse(MINI_DIR / "farmer-service-list.html")
+
+
+@app.get("/mini/farmer-provider-detail")
+def mini_farmer_provider_detail_page():
+    return FileResponse(MINI_DIR / "farmer-provider-detail.html")
+
+
+@app.get("/mini/provider-ability-list")
+def mini_provider_ability_list_page():
+    return FileResponse(MINI_DIR / "provider-ability-list.html")
+
+
+@app.get("/mini/provider-ability-edit")
+def mini_provider_ability_edit_page():
+    return FileResponse(MINI_DIR / "provider-ability-edit.html")
 
 
 @app.post("/api/auth/login")
@@ -714,3 +800,189 @@ def file_download(file_id: str, user=Depends(current_user)):
         media_type=content_type,
         headers={"Content-Disposition": f"inline; filename*=UTF-8''{target['fileName']}"},
     )
+
+
+def _provider_guard(user_ctx: dict) -> dict:
+    if user_ctx["role"] != "PROVIDER":
+        raise HTTPException(status_code=403, detail="仅服务方可操作")
+    latest = _latest_apply_by_user(user_ctx["user_id"])
+    if not latest or latest["auditStatus"] != "APPROVED":
+        raise HTTPException(status_code=403, detail="服务方尚未审核通过，暂不能维护服务能力")
+    provider = next((x for x in PROVIDERS if x["userId"] == user_ctx["user_id"]), None)
+    if not provider or provider.get("status", "NORMAL") != "NORMAL":
+        raise HTTPException(status_code=403, detail="服务方状态异常")
+    return provider
+
+
+@app.get("/api/provider/ability/list")
+def provider_ability_list(user=Depends(current_user)):
+    provider = _provider_guard(user)
+    items = [x for x in SERVICE_ABILITIES if x["providerId"] == provider["providerId"]]
+    return {"code": 200, "data": items}
+
+
+@app.post("/api/provider/ability/create")
+def provider_ability_create(req: AbilityUpsertRequest, user=Depends(current_user)):
+    provider = _provider_guard(user)
+    new_id = len(SERVICE_ABILITIES) + 20001
+    item = req.model_dump()
+    item.update({"id": new_id, "providerId": provider["providerId"], "userId": user["user_id"], "status": "ENABLE"})
+    SERVICE_ABILITIES.append(item)
+    return {"code": 200, "message": "新增成功", "data": {"id": new_id}}
+
+
+@app.post("/api/provider/ability/update")
+def provider_ability_update(req: AbilityUpsertRequest, user=Depends(current_user)):
+    provider = _provider_guard(user)
+    target = next((x for x in SERVICE_ABILITIES if x["id"] == req.id), None)
+    if not target or target["providerId"] != provider["providerId"]:
+        raise HTTPException(status_code=404, detail="服务能力不存在")
+    status = target["status"]
+    target.update(req.model_dump())
+    target["status"] = status
+    return {"code": 200, "message": "修改成功"}
+
+
+@app.post("/api/provider/ability/enable")
+def provider_ability_enable(req: AbilitySwitchRequest, user=Depends(current_user)):
+    provider = _provider_guard(user)
+    target = next((x for x in SERVICE_ABILITIES if x["id"] == req.id), None)
+    if not target or target["providerId"] != provider["providerId"]:
+        raise HTTPException(status_code=404, detail="服务能力不存在")
+    target["status"] = "ENABLE"
+    return {"code": 200, "message": "已启用"}
+
+
+@app.post("/api/provider/ability/disable")
+def provider_ability_disable(req: AbilitySwitchRequest, user=Depends(current_user)):
+    provider = _provider_guard(user)
+    target = next((x for x in SERVICE_ABILITIES if x["id"] == req.id), None)
+    if not target or target["providerId"] != provider["providerId"]:
+        raise HTTPException(status_code=404, detail="服务能力不存在")
+    target["status"] = "DISABLE"
+    return {"code": 200, "message": "已停用"}
+
+
+@app.get("/api/provider/ability/detail")
+def provider_ability_detail(id: int, user=Depends(current_user)):
+    provider = _provider_guard(user)
+    target = next((x for x in SERVICE_ABILITIES if x["id"] == id and x["providerId"] == provider["providerId"]), None)
+    if not target:
+        raise HTTPException(status_code=404, detail="服务能力不存在")
+    return {"code": 200, "data": target}
+
+
+@app.get("/api/farmer/service/category/list")
+def farmer_service_category_list(user=Depends(current_user)):
+    if user["role"] != "FARMER":
+        raise HTTPException(status_code=403, detail="仅农户可访问")
+    return {"code": 200, "data": SERVICE_CATEGORIES}
+
+
+@app.get("/api/farmer/provider/list")
+def farmer_provider_list(serviceType: str = "", regionCode: str = "", keyword: str = "", availableStatus: str = "", pageNum: int = 1, pageSize: int = 20, user=Depends(current_user)):
+    if user["role"] != "FARMER":
+        raise HTTPException(status_code=403, detail="仅农户可访问")
+    items = []
+    for a in SERVICE_ABILITIES:
+        if a["status"] != "ENABLE":
+            continue
+        p = next((x for x in PROVIDERS if x["providerId"] == a["providerId"]), None)
+        if not p or p.get("auditStatus") != "APPROVED" or p.get("status", "NORMAL") != "NORMAL":
+            continue
+        if serviceType and a["serviceType"] != serviceType:
+            continue
+        if regionCode and a.get("regionCode") != regionCode:
+            continue
+        if availableStatus and a.get("availableStatus") != availableStatus:
+            continue
+        if keyword and keyword not in f"{p.get('providerName','')}{a.get('abilityName','')}{a.get('abilityDesc','')}":
+            continue
+        profile_score = len([k for k in [a.get("contactPhone"), a.get("wechatNo"), a.get("priceDesc"), a.get("dailyCapacity")] if k])
+        items.append({"providerId": p["providerId"], "providerName": p["providerName"], "serviceType": a["serviceType"], "abilityId": a["id"], "abilityName": a["abilityName"], "abilityDesc": a["abilityDesc"], "serviceArea": a["serviceArea"], "availableStatus": a.get("availableStatus", "AVAILABLE"), "contactPhone": a.get("contactPhone", p.get("contactPhone", "")), "profileScore": profile_score, "updateTime": a.get("updateTime", "")})
+    order = {"AVAILABLE": 0, "BUSY": 1, "STOPPED": 2}
+    items.sort(key=lambda x: (order.get(x.get("availableStatus", "AVAILABLE"), 9), -x.get("profileScore", 0), x.get("updateTime", "")), reverse=False)
+    start = (pageNum - 1) * pageSize
+    return {"code": 200, "data": {"total": len(items), "items": items[start:start + pageSize]}}
+
+
+@app.get("/api/farmer/provider/detail")
+def farmer_provider_detail(providerId: int, abilityId: int, user=Depends(current_user)):
+    if user["role"] != "FARMER":
+        raise HTTPException(status_code=403, detail="仅农户可访问")
+    p = next((x for x in PROVIDERS if x["providerId"] == providerId and x.get("auditStatus") == "APPROVED"), None)
+    a = next((x for x in SERVICE_ABILITIES if x["id"] == abilityId and x["providerId"] == providerId and x["status"] == "ENABLE"), None)
+    if not p or not a:
+        raise HTTPException(status_code=404, detail="服务信息不存在")
+    return {"code": 200, "data": {"provider": p, "ability": a}}
+
+
+@app.post("/api/farmer/contact-log/create")
+def farmer_contact_log_create(req: ContactLogCreateRequest, user=Depends(current_user)):
+    if user["role"] != "FARMER":
+        raise HTTPException(status_code=403, detail="仅农户可访问")
+    a = next((x for x in SERVICE_ABILITIES if x["id"] == req.abilityId and x["providerId"] == req.providerId), None)
+    p = next((x for x in PROVIDERS if x["providerId"] == req.providerId), None)
+    if not a or a["status"] != "ENABLE" or not p or p.get("auditStatus") != "APPROVED":
+        raise HTTPException(status_code=400, detail="该服务暂不可联系")
+    SERVICE_CONTACT_LOGS.append({"id": len(SERVICE_CONTACT_LOGS) + 30001, "farmerUserId": user["user_id"], "providerId": req.providerId, "abilityId": req.abilityId, "contactType": req.contactType, "sourcePage": req.sourcePage, "createTime": datetime.now(timezone.utc).isoformat()})
+    a["contactCount"] = a.get("contactCount", 0) + 1
+    return {"code": 200, "message": "联系记录已保存"}
+
+
+@app.get("/api/admin/service-ability/list")
+def admin_service_ability_list(serviceType: str = "", providerName: str = "", status: str = "", user=Depends(current_user)):
+    if user["role"] not in {"ADMIN", "OPERATOR", "GOV_ADMIN"}:
+        raise HTTPException(status_code=403, detail="无权限")
+    items = SERVICE_ABILITIES
+    if serviceType:
+        items = [x for x in items if x.get("serviceType") == serviceType]
+    if status:
+        items = [x for x in items if x.get("status") == status]
+    if providerName:
+        items = [x for x in items if providerName in next((p.get("providerName", "") for p in PROVIDERS if p["providerId"] == x["providerId"]), "")]
+    return {"code": 200, "data": items}
+
+
+@app.get("/api/admin/service-ability/detail")
+def admin_service_ability_detail(id: int, user=Depends(current_user)):
+    if user["role"] not in {"ADMIN", "OPERATOR", "GOV_ADMIN"}:
+        raise HTTPException(status_code=403, detail="无权限")
+    target = next((x for x in SERVICE_ABILITIES if x["id"] == id), None)
+    if not target:
+        raise HTTPException(status_code=404, detail="服务能力不存在")
+    return {"code": 200, "data": target}
+
+
+@app.post("/api/admin/service-ability/disable")
+def admin_service_ability_disable(req: AbilitySwitchRequest, user=Depends(current_user)):
+    if user["role"] not in {"ADMIN", "OPERATOR"}:
+        raise HTTPException(status_code=403, detail="无权限")
+    target = next((x for x in SERVICE_ABILITIES if x["id"] == req.id), None)
+    if not target:
+        raise HTTPException(status_code=404, detail="服务能力不存在")
+    target["status"] = "DISABLE"
+    return {"code": 200, "message": "已下架"}
+
+
+@app.get("/api/admin/contact-log/list")
+def admin_contact_log_list(providerId: int = 0, serviceType: str = "", user=Depends(current_user)):
+    if user["role"] not in {"ADMIN", "OPERATOR", "GOV_ADMIN"}:
+        raise HTTPException(status_code=403, detail="无权限")
+    items = SERVICE_CONTACT_LOGS
+    if providerId:
+        items = [x for x in items if x.get("providerId") == providerId]
+    if serviceType:
+        ability_map = {a["id"]: a.get("serviceType", "") for a in SERVICE_ABILITIES}
+        items = [x for x in items if ability_map.get(x.get("abilityId")) == serviceType]
+    return {"code": 200, "data": items}
+
+
+@app.get("/api/admin/contact-log/stat")
+def admin_contact_log_stat(user=Depends(current_user)):
+    if user["role"] not in {"ADMIN", "OPERATOR", "GOV_ADMIN"}:
+        raise HTTPException(status_code=403, detail="无权限")
+    stat: dict[int, int] = {}
+    for x in SERVICE_CONTACT_LOGS:
+        stat[x["providerId"]] = stat.get(x["providerId"], 0) + 1
+    return {"code": 200, "data": stat}

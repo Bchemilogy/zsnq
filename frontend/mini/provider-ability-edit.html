@@ -1,0 +1,11 @@
+<!doctype html><html lang='zh-CN'><head><meta charset='UTF-8'/><meta name='viewport' content='width=device-width,initial-scale=1.0'/><title>新增服务能力</title></head><body><h1>新增服务能力</h1><p><a href='/mini/provider-ability-list'>返回能力列表</a></p>
+<form id='f'>
+<p>服务类型<select id='serviceType'><option value='AGRICULTURAL_MACHINERY'>农机服务</option><option value='SEEDLING'>育秧服务</option><option value='DRYING'>烘干服务</option><option value='STORAGE'>仓储服务</option><option value='PLANTING_GUIDE'>种植指导</option><option value='OTHER'>其他服务</option></select></p>
+<p>服务名称<input id='abilityName' value='水稻收割服务'/></p><p>服务说明<textarea id='abilityDesc'>拥有收割机3台</textarea></p>
+<p>服务区域<input id='serviceArea' value='某县某乡镇'/></p><p>联系电话<input id='contactPhone' value='13800000000'/></p><p>微信号<input id='wechatNo' value='wx_demo'/></p>
+<p>价格说明<input id='priceDesc' value='80元/亩'/></p><p>设备名称<input id='equipmentName' value='收割机'/></p><p>设备数量<input id='equipmentCount' value='3'/></p><p>日服务能力<input id='dailyCapacity' value='100亩/天'/></p>
+<button>提交</button></form><p id='msg'></p>
+<script>
+const t=localStorage.getItem('mini_token');if(!t)location.href='/mini/login';
+document.getElementById('f').addEventListener('submit',async(e)=>{e.preventDefault();const body={serviceType:serviceType.value,abilityName:abilityName.value,abilityDesc:abilityDesc.value,serviceArea:serviceArea.value,contactPhone:contactPhone.value,wechatNo:wechatNo.value,priceDesc:priceDesc.value,equipmentName:equipmentName.value,equipmentCount:Number(equipmentCount.value||0),dailyCapacity:dailyCapacity.value,imageUrls:[]};const r=await fetch('/api/provider/ability/create',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${t}`},body:JSON.stringify(body)});const d=await r.json();msg.textContent=r.ok?d.message:d.detail;if(r.ok)location.href='/mini/provider-ability-list';});
+</script></body></html>

@@ -1,0 +1,9 @@
+:root{--primary:#2f7d32;--secondary:#4caf50;--bg:#f4fbf4;--card:#ffffff;--text:#1f2a1f;--muted:#6b7b6b}
+*{box-sizing:border-box}body{margin:0;font-family:"Microsoft YaHei",sans-serif;background:linear-gradient(135deg,#eef9ef,#f7fbff);color:var(--text);padding:24px}
+h1{margin:0 0 16px;color:var(--primary)}
+a{color:#1b5e20;text-decoration:none;font-weight:600}a:hover{text-decoration:underline}
+.card,form,pre,table,ul,p{background:var(--card);border-radius:12px;padding:12px 14px;box-shadow:0 4px 14px rgba(47,125,50,.08);border:1px solid #e3efe4}
+button{background:var(--primary);color:#fff;border:none;border-radius:8px;padding:8px 12px;cursor:pointer}
+input,select,textarea{width:100%;padding:8px;border:1px solid #c8ddc9;border-radius:8px;margin:6px 0 10px;background:#fbfffb}
+pre{white-space:pre-wrap;word-break:break-word}
+.banner{background:url('https://images.unsplash.com/photo-1500937386664-56d1dfef3854?auto=format&fit=crop&w=1400&q=60') center/cover;border-radius:14px;padding:28px;color:#fff;font-size:20px;font-weight:700;text-shadow:0 2px 6px rgba(0,0,0,.35);margin-bottom:18px}

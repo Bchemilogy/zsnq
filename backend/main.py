@@ -298,6 +298,10 @@ def mini_farmer_home_page():
 def mini_provider_home_page():
     return FileResponse(MINI_DIR / "provider-home.html")
 
+@app.get("/mini/provider-profile")
+def mini_provider_profile_page():
+    return FileResponse(MINI_DIR / "provider-profile.html")
+
 
 @app.get("/mini/provider-onboard")
 def mini_provider_onboard_page():

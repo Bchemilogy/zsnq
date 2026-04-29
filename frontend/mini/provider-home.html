@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>服务方工作台</title>
+  </head>
+  <body>
+    <h1>服务方工作台（第一版）</h1>
+    <pre id="data"></pre>
+    <p><a href="/mini/provider-onboard">我的资料/入驻资料</a></p>
+    <button id="logout">退出登录</button>
+
+    <script>
+      const token = localStorage.getItem('mini_token');
+      if (!token) location.href = '/mini/login';
+
+      async function loadWorkbench() {
+        const res = await fetch('/api/provider/workbench', { headers: { Authorization: `Bearer ${token}` } });
+        const data = await res.json();
+        if (!res.ok) {
+          if ((data.detail || '').includes('尚未审核通过')) {
+            location.href = '/mini/provider-apply-status';
+            return;
+          }
+          document.getElementById('data').textContent = data.detail || '加载失败';
+          return;
+        }
+        document.getElementById('data').textContent = JSON.stringify(data.data, null, 2);
+      }
+
+      document.getElementById('logout').addEventListener('click', async () => {
+        await fetch('/api/auth/logout', { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
+        localStorage.removeItem('mini_token');
+        location.href = '/mini/login';
+      });
+
+      loadWorkbench();
+    </script>
+  </body>
+</html>

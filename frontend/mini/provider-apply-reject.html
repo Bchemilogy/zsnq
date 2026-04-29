@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title>驳回详情</title></head>
+  <body>
+    <h1>入驻申请已驳回</h1>
+    <p id="reason"></p>
+    <button onclick="location.href='/mini/provider-onboard'">修改资料并重新提交</button>
+    <script>
+      const token = localStorage.getItem('mini_token');
+      if (!token) location.href = '/mini/login';
+      async function load() {
+        const res = await fetch('/api/provider/apply/status', { headers: { Authorization: `Bearer ${token}` } });
+        const data = await res.json();
+        if (!res.ok) { document.getElementById('reason').textContent = data.detail; return; }
+        document.getElementById('reason').textContent = `驳回原因：${data.rejectReason || '无'}`;
+      }
+      load();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>服务方入驻申请</title>
+    <style>
+      body { font-family: Arial, 'Microsoft YaHei', sans-serif; max-width: 760px; margin: 20px auto; padding: 0 12px; }
+      input, textarea, select { width: 100%; padding: 8px; margin-top: 4px; margin-bottom: 10px; }
+      button { padding: 8px 12px; margin-right: 8px; }
+      .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+      .hint { color: #475569; font-size: 13px; }
+    </style>
+  </head>
+  <body>
+    <h1>服务方入驻申请</h1>
+    <p><a href="/mini/login">返回登录页</a></p>
+    <p class="hint">第一版：先提交基础信息 + 附件 URL。</p>
+
+    <form id="form">
+      <div class="row">
+        <label>主体名称<input id="providerName" required /></label>
+        <label>联系人<input id="contactName" required /></label>
+      </div>
+      <div class="row">
+        <label>联系电话<input id="contactPhone" required /></label>
+        <label>服务方类型
+          <select id="providerType">
+            <option value="PERSONAL">个人</option>
+            <option value="COOPERATIVE">合作社</option>
+            <option value="ENTERPRISE">企业</option>
+            <option value="BIG_FARM">种植大户</option>
+          </select>
+        </label>
+      </div>
+      <div class="row">
+        <label>区域编码<input id="regionCode" value="360000" /></label>
+        <label>服务区域<input id="serviceArea" required /></label>
+      </div>
+      <label>详细地址<input id="address" required /></label>
+      <label>服务类型（逗号分隔）<input id="serviceTypes" value="AGRICULTURAL_MACHINERY,DRYING" required /></label>
+      <label>服务能力说明<textarea id="serviceDescription" rows="3"></textarea></label>
+
+      <h3>附件（模拟上传）</h3>
+      <div class="row">
+        <label>营业执照文件名<input id="licenseFile" value="营业执照.jpg" /></label>
+        <label>设备照片文件名<input id="deviceFile" value="设备照片.jpg" /></label>
+      </div>
+      <button type="button" id="uploadFiles">先上传附件</button>
+      <span id="uploadMsg"></span>
+
+      <div style="margin-top: 12px">
+        <button type="submit">提交入驻申请</button>
+        <button type="button" id="resubmit">驳回后重提</button>
+      </div>
+    </form>
+
+    <p id="msg"></p>
+
+    <script>
+      const token = localStorage.getItem('mini_token');
+      if (!token) location.href = '/mini/login';
+
+      let attachments = [];
+
+      async function uploadOne(fileName, fileType, fileTag) {
+        const res = await fetch('/api/file/upload', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ fileName, fileType, fileSize: 1024 }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || '上传失败');
+        return { fileType: fileTag, fileName: data.data.fileName, fileUrl: data.data.fileUrl };
+      }
+
+      document.getElementById('uploadFiles').addEventListener('click', async () => {
+        const uploadMsg = document.getElementById('uploadMsg');
+        uploadMsg.textContent = '上传中...';
+        try {
+          const license = await uploadOne(document.getElementById('licenseFile').value, 'jpg', 'BUSINESS_LICENSE');
+          const device = await uploadOne(document.getElementById('deviceFile').value, 'jpg', 'DEVICE_PHOTO');
+          attachments = [license, device];
+          uploadMsg.textContent = '上传成功';
+        } catch (e) {
+          uploadMsg.textContent = e.message;
+        }
+      });
+
+      function buildPayload() {
+        return {
+          providerName: document.getElementById('providerName').value,
+          contactName: document.getElementById('contactName').value,
+          contactPhone: document.getElementById('contactPhone').value,
+          providerType: document.getElementById('providerType').value,
+          regionCode: document.getElementById('regionCode').value,
+          address: document.getElementById('address').value,
+          serviceTypes: document.getElementById('serviceTypes').value.split(',').map((x) => x.trim()).filter(Boolean),
+          serviceDescription: document.getElementById('serviceDescription').value,
+          serviceArea: document.getElementById('serviceArea').value,
+          attachments,
+        };
+      }
+
+      document.getElementById('form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const res = await fetch('/api/provider/apply/submit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify(buildPayload()),
+        });
+        const data = await res.json();
+        document.getElementById('msg').textContent = res.ok ? data.message : data.detail;
+        if (res.ok) location.href = '/mini/provider-apply-status';
+      });
+
+      document.getElementById('resubmit').addEventListener('click', async () => {
+        const res = await fetch('/api/provider/apply/resubmit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify(buildPayload()),
+        });
+        const data = await res.json();
+        document.getElementById('msg').textContent = res.ok ? data.message : data.detail;
+        if (res.ok) location.href = '/mini/provider-apply-status';
+      });
+    </script>
+  </body>
+</html>

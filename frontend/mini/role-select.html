@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>身份选择页</title><link rel='stylesheet' href='/theme.css'/>
+  </head>
+  <body><div class="banner">农服数字平台</div>
+    <h1>身份选择页（最小版）</h1>
+    <p id="user"></p>
+    <button onclick="location.href='/mini/farmer-home'">进入农户测试首页</button>
+    <button onclick="location.href='/mini/provider-home'">进入服务方测试首页</button>
+    <p><a href="/mini/login">返回登录页</a></p>
+
+    <script>
+      const token = localStorage.getItem('mini_token');
+      if (!token) {
+        location.href = '/mini/login';
+      }
+
+      async function loadCurrentUser() {
+        const res = await fetch('/api/auth/current-user', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          localStorage.removeItem('mini_token');
+          location.href = '/mini/login';
+          return;
+        }
+        document.getElementById('user').textContent = `当前用户：${data.username}（${data.role}）`;
+      }
+
+      loadCurrentUser();
+    </script>
+  </body>
+</html>

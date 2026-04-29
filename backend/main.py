@@ -137,20 +137,26 @@ MENU_LIST = {
     "FARMER": [
         {"path": "/mini/farmer-home", "name": "农户测试首页"},
         {"path": "/mini/farmer-index", "name": "找服务"},
+    {"path": "/mini/farmer-demand-create", "name": "提交需求"},
     ],
     "PROVIDER": [
         {"path": "/mini/provider-home", "name": "服务方测试首页"},
         {"path": "/mini/provider-onboard", "name": "服务方入驻申请"},
         {"path": "/mini/provider-ability-list", "name": "服务能力管理"},
+    {"path": "/mini/provider-demand-list", "name": "农户需求"},
     ],
 }
 MENU_LIST["ADMIN"] += [
     {"path": "/ops/service-ability", "name": "服务能力管理"},
     {"path": "/ops/contact-log", "name": "联系记录"},
+    {"path": "/ops/demand", "name": "农户需求管理"},
+    {"path": "/ops/service-record", "name": "服务记录管理"},
 ]
 MENU_LIST["OPERATOR"] += [
     {"path": "/ops/service-ability", "name": "服务能力管理"},
     {"path": "/ops/contact-log", "name": "联系记录"},
+    {"path": "/ops/demand", "name": "农户需求管理"},
+    {"path": "/ops/service-record", "name": "服务记录管理"},
 ]
 
 # 小程序测试用户映射：用 code 直接模拟绑定用户
@@ -297,6 +303,23 @@ def mini_provider_apply_status_page():
 def mini_provider_apply_reject_page():
     return FileResponse(MINI_DIR / "provider-apply-reject.html")
 
+
+
+@app.get("/mini/farmer-demand-create")
+def mini_farmer_demand_create_page():
+    return FileResponse(MINI_DIR / "farmer-demand-create.html")
+
+@app.get("/mini/provider-demand-list")
+def mini_provider_demand_list_page():
+    return FileResponse(MINI_DIR / "provider-demand-list.html")
+
+@app.get("/ops/demand")
+def admin_demand_page():
+    return FileResponse(ADMIN_DIR / "demand.html")
+
+@app.get("/ops/service-record")
+def admin_service_record_page():
+    return FileResponse(ADMIN_DIR / "service-record.html")
 
 @app.get("/operate/provider-audit")
 def admin_provider_audit_page():
@@ -991,3 +1014,162 @@ def admin_contact_log_stat(user=Depends(current_user)):
     for x in SERVICE_CONTACT_LOGS:
         stat[x["providerId"]] = stat.get(x["providerId"], 0) + 1
     return {"code": 200, "data": stat}
+
+# 第四闭环：需求与留痕
+SERVICE_DEMANDS: list[dict] = []
+SERVICE_RECORDS: list[dict] = []
+SERVICE_EVIDENCES: list[dict] = []
+SERVICE_DEMAND_LOGS: list[dict] = []
+
+
+class FarmerDemandCreateRequest(BaseModel):
+    providerId: int
+    abilityId: int
+    serviceType: str
+    contactName: str
+    contactPhone: str
+    regionCode: str = ""
+    serviceAddress: str
+    quantity: float
+    unit: str
+    expectedTime: str
+    remark: str = ""
+
+
+class DemandActionRequest(BaseModel):
+    demandId: int
+
+
+class EvidenceItem(BaseModel):
+    evidenceType: str
+    fileName: str
+    fileUrl: str
+
+
+class ServiceRecordCreateRequest(BaseModel):
+    demandId: int
+    serviceType: str
+    serviceAddress: str
+    processQuantity: float
+    unit: str
+    startTime: str
+    endTime: str
+    description: str = ""
+    evidences: list[EvidenceItem]
+
+
+def _append_demand_log(demand_id: int, user: dict, before_status: str, after_status: str, action: str):
+    SERVICE_DEMAND_LOGS.append({"id": len(SERVICE_DEMAND_LOGS) + 50001, "demandId": demand_id, "operatorUserId": user["user_id"], "operatorRole": user["role"], "beforeStatus": before_status, "afterStatus": after_status, "action": action, "createTime": datetime.now(timezone.utc).isoformat()})
+
+
+@app.post('/api/farmer/demand/create')
+def farmer_demand_create(req: FarmerDemandCreateRequest, user=Depends(current_user)):
+    if user['role'] != 'FARMER':
+        raise HTTPException(status_code=403, detail='仅农户可操作')
+    if req.quantity <= 0 or not req.contactPhone.strip():
+        raise HTTPException(status_code=400, detail='数量和联系电话必须有效')
+    provider = next((x for x in PROVIDERS if x['providerId'] == req.providerId and x.get('auditStatus') == 'APPROVED'), None)
+    ability = next((x for x in SERVICE_ABILITIES if x['id'] == req.abilityId and x['providerId'] == req.providerId and x['status'] == 'ENABLE'), None)
+    if not provider or not ability:
+        raise HTTPException(status_code=400, detail='服务方或服务能力无效')
+    demand_id = len(SERVICE_DEMANDS) + 30001
+    item = req.model_dump()
+    item.update({'id': demand_id, 'farmerUserId': user['user_id'], 'status': 'SUBMITTED', 'createTime': datetime.now(timezone.utc).isoformat()})
+    SERVICE_DEMANDS.append(item)
+    _append_demand_log(demand_id, user, '', 'SUBMITTED', 'CREATE')
+    return {'code': 200, 'message': '需求提交成功', 'data': {'demandId': demand_id, 'status': 'SUBMITTED'}}
+
+
+@app.get('/api/farmer/demand/list')
+def farmer_demand_list(user=Depends(current_user)):
+    if user['role'] != 'FARMER':
+        raise HTTPException(status_code=403, detail='仅农户可访问')
+    items = [x for x in SERVICE_DEMANDS if x['farmerUserId'] == user['user_id']]
+    return {'code': 200, 'data': items}
+
+
+@app.get('/api/farmer/demand/detail')
+def farmer_demand_detail(id: int, user=Depends(current_user)):
+    if user['role'] != 'FARMER':
+        raise HTTPException(status_code=403, detail='仅农户可访问')
+    item = next((x for x in SERVICE_DEMANDS if x['id'] == id and x['farmerUserId'] == user['user_id']), None)
+    if not item:
+        raise HTTPException(status_code=404, detail='需求不存在')
+    return {'code': 200, 'data': item}
+
+
+@app.post('/api/provider/demand/contacted')
+def provider_demand_contacted(req: DemandActionRequest, user=Depends(current_user)):
+    provider = _provider_guard(user)
+    item = next((x for x in SERVICE_DEMANDS if x['id'] == req.demandId and x['providerId'] == provider['providerId']), None)
+    if not item:
+        raise HTTPException(status_code=404, detail='需求不存在')
+    before = item['status']; item['status'] = 'CONTACTED'; item['contactedTime'] = datetime.now(timezone.utc).isoformat()
+    _append_demand_log(item['id'], user, before, 'CONTACTED', 'CONTACTED')
+    return {'code': 200, 'message': '已标记联系'}
+
+
+@app.post('/api/provider/demand/start-service')
+def provider_demand_start(req: DemandActionRequest, user=Depends(current_user)):
+    provider = _provider_guard(user)
+    item = next((x for x in SERVICE_DEMANDS if x['id'] == req.demandId and x['providerId'] == provider['providerId']), None)
+    if not item:
+        raise HTTPException(status_code=404, detail='需求不存在')
+    before = item['status']; item['status'] = 'SERVICING'; item['serviceStartTime'] = datetime.now(timezone.utc).isoformat()
+    _append_demand_log(item['id'], user, before, 'SERVICING', 'START_SERVICE')
+    return {'code': 200, 'message': '已标记服务中'}
+
+
+@app.get('/api/provider/demand/list')
+def provider_demand_list(status: str = '', serviceType: str = '', user=Depends(current_user)):
+    provider = _provider_guard(user)
+    items = [x for x in SERVICE_DEMANDS if x['providerId'] == provider['providerId']]
+    if status: items = [x for x in items if x.get('status') == status]
+    if serviceType: items = [x for x in items if x.get('serviceType') == serviceType]
+    return {'code': 200, 'data': items}
+
+
+@app.post('/api/provider/service-record/create')
+def provider_record_create(req: ServiceRecordCreateRequest, user=Depends(current_user)):
+    provider = _provider_guard(user)
+    demand = next((x for x in SERVICE_DEMANDS if x['id'] == req.demandId and x['providerId'] == provider['providerId']), None)
+    if not demand or demand.get('status') == 'CANCELLED':
+        raise HTTPException(status_code=400, detail='需求不可提交记录')
+    if req.processQuantity <= 0 or req.endTime < req.startTime:
+        raise HTTPException(status_code=400, detail='处理量或时间无效')
+    if not any(x.evidenceType == 'WORK_PHOTO' for x in req.evidences):
+        raise HTTPException(status_code=400, detail='至少上传一张作业照片')
+    record_id = len(SERVICE_RECORDS) + 40001
+    rec = req.model_dump(); rec.update({'id': record_id, 'providerId': provider['providerId'], 'farmerUserId': demand['farmerUserId'], 'abilityId': demand['abilityId'], 'recordStatus': 'SUBMITTED', 'createTime': datetime.now(timezone.utc).isoformat()})
+    SERVICE_RECORDS.append(rec)
+    for ev in req.evidences:
+        SERVICE_EVIDENCES.append({'id': len(SERVICE_EVIDENCES)+60001,'recordId':record_id,'demandId':demand['id'],'providerId':provider['providerId'],'farmerUserId':demand['farmerUserId'], **ev.model_dump()})
+    before = demand['status']; demand['status'] = 'COMPLETED'; demand['completedTime'] = datetime.now(timezone.utc).isoformat()
+    _append_demand_log(demand['id'], user, before, 'COMPLETED', 'UPLOAD_RECORD')
+    return {'code': 200, 'message': '服务记录已提交', 'data': {'recordId': record_id, 'demandStatus': 'COMPLETED'}}
+
+
+@app.get('/api/admin/demand/list')
+def admin_demand_list(status: str = '', serviceType: str = '', user=Depends(current_user)):
+    if user['role'] not in {'ADMIN','OPERATOR','GOV_ADMIN'}: raise HTTPException(status_code=403, detail='无权限')
+    items = SERVICE_DEMANDS
+    if status: items = [x for x in items if x.get('status') == status]
+    if serviceType: items = [x for x in items if x.get('serviceType') == serviceType]
+    return {'code': 200, 'data': items}
+
+
+@app.get('/api/admin/service-record/list')
+def admin_record_list(user=Depends(current_user)):
+    if user['role'] not in {'ADMIN','OPERATOR','GOV_ADMIN'}: raise HTTPException(status_code=403, detail='无权限')
+    return {'code': 200, 'data': SERVICE_RECORDS}
+
+
+@app.get('/api/admin/evidence-chain/detail')
+def admin_evidence_chain_detail(recordId: int, user=Depends(current_user)):
+    if user['role'] not in {'ADMIN','OPERATOR','GOV_ADMIN'}: raise HTTPException(status_code=403, detail='无权限')
+    record = next((x for x in SERVICE_RECORDS if x['id'] == recordId), None)
+    if not record: raise HTTPException(status_code=404, detail='记录不存在')
+    demand = next((x for x in SERVICE_DEMANDS if x['id'] == record['demandId']), None)
+    evs = [x for x in SERVICE_EVIDENCES if x['recordId'] == recordId]
+    logs = [x for x in SERVICE_DEMAND_LOGS if x['demandId'] == record['demandId']]
+    return {'code': 200, 'data': {'demand': demand, 'record': record, 'evidences': evs, 'logs': logs}}

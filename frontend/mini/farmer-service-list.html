@@ -1,0 +1,4 @@
+<!doctype html><html lang='zh-CN'><head><meta charset='UTF-8'/><meta name='viewport' content='width=device-width,initial-scale=1.0'/><title>服务方列表</title></head><body><h1>服务方列表</h1><p><a href='/mini/farmer-index'>返回分类</a></p><p id='msg'></p><div id='list'></div><script>
+const t=localStorage.getItem('mini_token');if(!t)location.href='/mini/login';const st=new URLSearchParams(location.search).get('serviceType')||'';
+(async()=>{const r=await fetch(`/api/farmer/provider/list?serviceType=${st}`,{headers:{Authorization:`Bearer ${t}`}});const d=await r.json();if(!r.ok){msg.textContent=d.detail;return;}msg.textContent=`共${d.data.total}条`;list.innerHTML=d.data.items.map(x=>`<div style='border:1px solid #ddd;margin:8px;padding:8px'><h3>${x.providerName}</h3><p>${x.abilityName} | ${x.serviceArea}</p><p>${x.abilityDesc}</p><p><a href='/mini/farmer-provider-detail?providerId=${x.providerId}&abilityId=${x.abilityId}'>查看详情</a></p></div>`).join('');})();
+</script></body></html>

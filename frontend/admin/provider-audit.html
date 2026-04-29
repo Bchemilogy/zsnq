@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>服务方入驻审核</title>
+    <style>
+      body{font-family:Arial,'Microsoft YaHei';background:#f8fafc;margin:0}.wrap{max-width:1080px;margin:22px auto;padding:0 12px}
+      .card{background:#fff;border-radius:12px;padding:16px;box-shadow:0 10px 24px rgba(15,23,42,.08)}
+      table{width:100%;border-collapse:collapse}th,td{border:1px solid #e2e8f0;padding:8px;font-size:13px}th{background:#f1f5f9}
+      button{padding:6px 10px;border:0;border-radius:6px;color:#fff;cursor:pointer}.b1{background:#2563eb}.b2{background:#16a34a}.b3{background:#dc2626}
+    </style>
+  </head>
+  <body>
+    <div class="wrap"><div class="card">
+      <h1>服务方入驻审核</h1>
+      <p><a href="/dashboard">返回首页</a></p>
+      <p id="user"></p>
+      <p id="msg"></p>
+      <pre id="detail" style="background:#f8fafc;border:1px solid #e2e8f0;padding:10px;border-radius:8px;white-space:pre-wrap"></pre>
+      <table>
+        <thead><tr><th>申请ID</th><th>服务方名称</th><th>联系人</th><th>电话</th><th>状态</th><th>提交时间</th><th>操作</th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div></div>
+
+    <script>
+      const token = localStorage.getItem('token');
+      if (!token) location.href = '/admin';
+      let currentRole = '';
+      const map = { NOT_SUBMITTED:'未提交', PENDING:'审核中', APPROVED:'已通过', REJECTED:'未通过', DISABLED:'已禁用' };
+
+      async function loadCurrentUser() {
+        const res = await fetch('/api/auth/current-user', { headers: { Authorization: `Bearer ${token}` } });
+        const data = await res.json();
+        if (!res.ok) return;
+        currentRole = data.role;
+        document.getElementById('user').textContent = `当前账号：${data.username}（${data.role}）`; 
+      }
+
+      async function loadList() {
+        const res = await fetch('/api/admin/provider/apply/list', { headers: { Authorization: `Bearer ${token}` } });
+        const data = await res.json();
+        if (!res.ok) { document.getElementById('msg').textContent = data.detail || '加载失败'; return; }
+        const items = data.data || [];
+        document.getElementById('msg').textContent = `共 ${items.length} 条`;
+        const rows = document.getElementById('rows'); rows.innerHTML = '';
+        items.forEach((item) => {
+          const canAudit = currentRole === 'ADMIN' || currentRole === 'OPERATOR';
+          const tr = document.createElement('tr');
+          tr.innerHTML = `<td>${item.applyId}</td><td>${item.providerName}</td><td>${item.contactName}</td><td>${item.contactPhone}</td><td>${map[item.auditStatus]||item.auditStatus}（${item.auditStatus}）</td><td>${item.createTime||''}</td><td>
+            <button class="b1" onclick="viewDetail(${item.applyId})">查看详情</button>
+            ${canAudit ? `<button class="b2" onclick="approve(${item.applyId})">通过</button><button class="b3" onclick="rejectApply(${item.applyId})">驳回</button>` : '仅查看'}
+          </td>`;
+          rows.appendChild(tr);
+        });
+      }
+
+      async function viewDetail(applyId) {
+        const res = await fetch(`/api/admin/provider/apply/detail?applyId=${applyId}`, { headers: { Authorization: `Bearer ${token}` } });
+        const data = await res.json();
+        if (!res.ok) { alert(data.detail || '失败'); return; }
+        const apply = data.data.apply;
+        const logs = data.data.auditLogs || [];
+        const attachments = apply.attachments || [];
+        const fileLines = attachments.length
+          ? attachments.map((f, i) => `${i + 1}. ${f.fileType} | ${f.fileName} | ${f.fileUrl}`).join('\\n')
+          : '无附件';
+        document.getElementById('detail').textContent =
+          `申请详情\\n${JSON.stringify(apply, null, 2)}\\n\\n附件（可复制链接在浏览器打开/下载）\\n${fileLines}\\n\\n审核日志\\n${JSON.stringify(logs, null, 2)}`;
+      }
+
+      async function approve(applyId) {
+        const remark = prompt('审核备注（可空）') || '';
+        const res = await fetch('/api/admin/provider/apply/approve', { method:'POST', headers:{'Content-Type':'application/json', Authorization:`Bearer ${token}`}, body:JSON.stringify({applyId,auditRemark:remark}) });
+        const data = await res.json(); alert(data.message || data.detail); loadList();
+      }
+      async function rejectApply(applyId) {
+        const reason = prompt('请输入驳回原因（必填）') || '';
+        if (!reason.trim()) { alert('驳回原因不能为空'); return; }
+        const res = await fetch('/api/admin/provider/apply/reject', { method:'POST', headers:{'Content-Type':'application/json', Authorization:`Bearer ${token}`}, body:JSON.stringify({applyId,rejectReason:reason}) });
+        const data = await res.json(); alert(data.message || data.detail); loadList();
+      }
+      window.viewDetail=viewDetail;window.approve=approve;window.rejectApply=rejectApply;
+      (async()=>{await loadCurrentUser();await loadList();})();
+    </script>
+  </body>
+</html>

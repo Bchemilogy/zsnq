@@ -4,6 +4,7 @@ from typing import Literal
 from uuid import uuid4
 import re
 import json
+import base64
 
 from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, UploadFile
 from fastapi.responses import FileResponse
@@ -200,6 +201,13 @@ DATA_FILE = BASE_DIR / "backend" / "data_store.json"
 
 
 def _save_data():
+    uploaded_files = {}
+    for fid, item in UPLOADED_FILES.items():
+        uploaded_files[fid] = {
+            "content": base64.b64encode(item.get("content", b"")).decode("utf-8"),
+            "fileName": item.get("fileName", ""),
+            "fileType": item.get("fileType", ""),
+        }
     DATA_FILE.write_text(json.dumps({
         "USERS": USERS,
         "ROLE_LIST": ROLE_LIST,
@@ -209,7 +217,7 @@ def _save_data():
         "PROVIDER_APPLIES": PROVIDER_APPLIES,
         "PROVIDERS": PROVIDERS,
         "PROVIDER_AUDIT_LOGS": PROVIDER_AUDIT_LOGS,
-        "UPLOADED_FILES": UPLOADED_FILES,
+        "UPLOADED_FILES": uploaded_files,
         "SERVICE_ABILITIES": SERVICE_ABILITIES,
         "SERVICE_CONTACT_LOGS": SERVICE_CONTACT_LOGS,
         "SERVICE_DEMANDS": SERVICE_DEMANDS,
@@ -231,7 +239,12 @@ def _load_data():
     PROVIDER_APPLIES[:] = data.get("PROVIDER_APPLIES", [])
     PROVIDERS[:] = data.get("PROVIDERS", [])
     PROVIDER_AUDIT_LOGS[:] = data.get("PROVIDER_AUDIT_LOGS", [])
-    UPLOADED_FILES.update(data.get("UPLOADED_FILES", {}))
+    for fid, item in data.get("UPLOADED_FILES", {}).items():
+        UPLOADED_FILES[fid] = {
+            "content": base64.b64decode((item.get("content") or "").encode("utf-8")) if item.get("content") else b"",
+            "fileName": item.get("fileName", ""),
+            "fileType": item.get("fileType", ""),
+        }
     SERVICE_ABILITIES[:] = data.get("SERVICE_ABILITIES", [])
     SERVICE_CONTACT_LOGS[:] = data.get("SERVICE_CONTACT_LOGS", [])
     SERVICE_DEMANDS[:] = data.get("SERVICE_DEMANDS", [])

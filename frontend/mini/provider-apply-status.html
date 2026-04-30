@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title>审核状态</title><link rel='stylesheet' href='/theme.css'/>
+  <style>body{font-family:Arial,'Microsoft YaHei';background:#f8fafc;margin:0}.card{max-width:620px;margin:40px auto;background:#fff;padding:22px;border-radius:14px;box-shadow:0 10px 24px rgba(15,23,42,.08)}</style></head>
+  <body><div class="banner">农服数字平台</div>
+    <div class="card">
+      <h1>入驻审核状态</h1>
+      <p id="status"></p>
+      <p id="detail"></p>
+      <p><a href="/mini/provider-onboard">返回申请页</a></p>
+    </div>
+    <script>
+      const token = localStorage.getItem('mini_token');
+      if (!token) location.href = '/mini/login';
+      const map = { NOT_SUBMITTED: '未提交', PENDING: '审核中', APPROVED: '已通过', REJECTED: '未通过', DISABLED: '已禁用' };
+      async function load() {
+        const res = await fetch('/api/provider/apply/status', { headers: { Authorization: `Bearer ${token}` } });
+        const data = await res.json();
+        if (!res.ok) { document.getElementById('status').textContent = data.detail; return; }
+        document.getElementById('status').textContent = `当前状态：${map[data.auditStatus] || data.auditStatus}`;
+        document.getElementById('detail').textContent = '请耐心等待审核结果';
+        if (data.auditStatus === 'REJECTED') location.href = '/mini/provider-apply-reject';
+      }
+      load();
+    </script>
+  </body>
+</html>

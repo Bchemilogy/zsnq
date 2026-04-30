@@ -14,6 +14,7 @@
       .b1{background:#2563eb}.b2{background:#0ea5e9}.b3{background:#f59e0b}
       .stype-table{width:100%;border-collapse:collapse}
       .stype-table td{border:1px solid #e2e8f0;padding:8px 10px;vertical-align:middle}
+      .stype-table label{display:inline-flex;align-items:center;gap:6px;margin:0}
     </style>
   </head>
   <body><div class="banner">农服数字平台</div>
@@ -64,8 +65,8 @@
           </div>
           <p>
             <button class="btn b2" type="button" id="uploadFiles">先上传附件</button>
-            <button class="btn b1" type="submit" id="submitBtn" disabled>提交入驻申请</button>
-            <button class="btn b3" type="button" id="resubmit" disabled>驳回后重提</button>
+            <button class="btn b1" type="submit" id="submitBtn">提交入驻申请</button>
+            <button class="btn b3" type="button" id="resubmit">驳回后重提</button>
           </p>
         </form>
       </div>
@@ -82,7 +83,9 @@
         formData.append('file', file);
         formData.append('fileType', (file.name.split('.').pop() || '').toLowerCase());
         const res = await fetch('/api/file/upload', { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: formData });
-        const data = await res.json();
+        const text = await res.text();
+        let data = {};
+        try { data = JSON.parse(text); } catch { throw new Error(text || '上传失败'); }
         if (!res.ok) throw new Error(data.detail || '上传失败');
         return { fileType: fileTag, fileName: data.data.fileName, fileUrl: data.data.fileUrl };
       }
@@ -97,8 +100,6 @@
           if (otherFile) list.push(await uploadOne(otherFile, 'OTHER_FILE'));
           attachments = list;
           uploaded = true;
-          document.getElementById('submitBtn').disabled = false;
-          document.getElementById('resubmit').disabled = false;
           alert(`附件上传成功，共 ${attachments.length} 个文件`);
         } catch (e) { alert(e.message); }
       });

@@ -111,21 +111,24 @@
 
         const username = document.getElementById('username').value;
         const password = document.getElementById('password').value;
-
-        const res = await fetch('/api/auth/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username, password, client_type: 'PC' }),
-        });
-
-        const data = await res.json();
-        if (!res.ok) {
-          msg.textContent = data.detail || '登录失败';
-          return;
+        try {
+          const res = await fetch('/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password, client_type: 'PC' }),
+          });
+          const text = await res.text();
+          let data = {};
+          try { data = JSON.parse(text); } catch { msg.textContent = text || '登录失败'; return; }
+          if (!res.ok) {
+            msg.textContent = data.detail || '登录失败';
+            return;
+          }
+          localStorage.setItem('token', data.token);
+          location.href = '/dashboard';
+        } catch (err) {
+          msg.textContent = err?.message || '网络异常，请稍后重试';
         }
-
-        localStorage.setItem('token', data.token);
-        location.href = '/dashboard';
       });
     </script>
   </body>

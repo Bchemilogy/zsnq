@@ -100,28 +100,33 @@
 
       async function doLogin(code) {
         msg.textContent = '登录中...';
-        const res = await fetch('/api/auth/wechat-login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ code }),
-        });
-        const data = await res.json();
+        try {
+          const res = await fetch('/api/auth/wechat-login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code }),
+          });
+          const loginText = await res.text();
+          let data = {};
+          try { data = JSON.parse(loginText); } catch { msg.textContent = loginText || '登录失败'; return; }
 
-        if (!res.ok) {
-          msg.textContent = data.detail || '登录失败';
-          return;
-        }
+          if (!res.ok) {
+            msg.textContent = data.detail || '登录失败';
+            return;
+          }
 
-        localStorage.setItem('mini_token', data.token);
-        const userRes = await fetch('/api/auth/current-user', {
-          headers: { Authorization: `Bearer ${data.token}` },
-        });
-        const user = await userRes.json();
+          localStorage.setItem('mini_token', data.token);
+          const userRes = await fetch('/api/auth/current-user', {
+            headers: { Authorization: `Bearer ${data.token}` },
+          });
+          const userText = await userRes.text();
+          let user = {};
+          try { user = JSON.parse(userText); } catch { msg.textContent = userText || '获取用户失败'; return; }
 
-        if (!userRes.ok) {
-          msg.textContent = user.detail || '获取用户失败';
-          return;
-        }
+          if (!userRes.ok) {
+            msg.textContent = user.detail || '获取用户失败';
+            return;
+          }
 
         if (user.role === 'FARMER') {
           location.href = '/mini/farmer-home';
@@ -131,7 +136,9 @@
           const statusRes = await fetch('/api/provider/apply/status', {
             headers: { Authorization: `Bearer ${data.token}` },
           });
-          const statusData = await statusRes.json();
+          const statusText = await statusRes.text();
+          let statusData = {};
+          try { statusData = JSON.parse(statusText); } catch { msg.textContent = statusText || '状态查询失败'; return; }
           if (!statusRes.ok) {
             msg.textContent = statusData.detail || '状态查询失败';
             return;
@@ -156,6 +163,9 @@
           return;
         }
         location.href = '/mini/role-select';
+        } catch (err) {
+          msg.textContent = err?.message || '网络异常，请稍后重试';
+        }
       }
 
       document.querySelectorAll('button[data-code]').forEach((btn) => {

@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang='zh-CN'>
+<head>
+  <meta charset='UTF-8'>
+  <meta name='viewport' content='width=device-width,initial-scale=1'>
+  <title>我的服务能力</title>
+  <link rel='stylesheet' href='/theme.css'>
+  <style>.item{display:flex;justify-content:space-between;align-items:center;gap:12px}.item h3{margin:0;font-size:16px}</style>
+</head>
+<body>
+  <div class='banner'>我的服务能力</div>
+  <h1>我的服务能力</h1>
+  <p><a href='/mini/provider-home'>返回工作台</a> | <a href='/mini/provider-ability-edit'>新增能力</a></p>
+  <div id='list'></div>
+  <script>
+    const t=localStorage.getItem('mini_token');
+    const map={AGRICULTURAL_MACHINERY:'农机服务',SEEDLING:'育秧服务',DRYING:'烘干服务',STORAGE:'仓储服务',PLANTING_GUIDE:'种植指导',OTHER:'其他服务'};
+    fetch('/api/provider/ability/list',{headers:{Authorization:`Bearer ${t}`}}).then(r=>r.json()).then(d=>{
+      list.innerHTML=(d.data||[]).map(x=>`<div class='card item'><h3>${map[x.serviceType]||x.serviceType} - ${x.abilityName}</h3><a href='/mini/provider-ability-edit?id=${x.id}'>查看详情</a></div>`).join('')||'暂无';
+    });
+  </script>
+</body>
+</html>

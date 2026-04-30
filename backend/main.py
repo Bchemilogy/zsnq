@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Literal
 from uuid import uuid4
 import re
+import json
 
 from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, UploadFile
 from fastapi.responses import FileResponse
@@ -190,6 +191,66 @@ SERVICE_CATEGORIES = [
 ]
 SERVICE_ABILITIES: list[dict] = []
 SERVICE_CONTACT_LOGS: list[dict] = []
+SERVICE_DEMANDS: list[dict] = []
+SERVICE_RECORDS: list[dict] = []
+SERVICE_EVIDENCES: list[dict] = []
+SERVICE_DEMAND_LOGS: list[dict] = []
+
+DATA_FILE = BASE_DIR / "backend" / "data_store.json"
+
+
+def _save_data():
+    DATA_FILE.write_text(json.dumps({
+        "USERS": USERS,
+        "ROLE_LIST": ROLE_LIST,
+        "TOKENS": TOKENS,
+        "LOGIN_LOGS": LOGIN_LOGS,
+        "PROVIDER_ONBOARDS": PROVIDER_ONBOARDS,
+        "PROVIDER_APPLIES": PROVIDER_APPLIES,
+        "PROVIDERS": PROVIDERS,
+        "PROVIDER_AUDIT_LOGS": PROVIDER_AUDIT_LOGS,
+        "UPLOADED_FILES": UPLOADED_FILES,
+        "SERVICE_ABILITIES": SERVICE_ABILITIES,
+        "SERVICE_CONTACT_LOGS": SERVICE_CONTACT_LOGS,
+        "SERVICE_DEMANDS": SERVICE_DEMANDS,
+        "SERVICE_RECORDS": SERVICE_RECORDS,
+        "SERVICE_EVIDENCES": SERVICE_EVIDENCES,
+        "SERVICE_DEMAND_LOGS": SERVICE_DEMAND_LOGS,
+    }, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def _load_data():
+    if not DATA_FILE.exists():
+        return
+    data = json.loads(DATA_FILE.read_text(encoding="utf-8"))
+    USERS.update(data.get("USERS", {}))
+    ROLE_LIST[:] = data.get("ROLE_LIST", ROLE_LIST)
+    TOKENS.update(data.get("TOKENS", {}))
+    LOGIN_LOGS[:] = data.get("LOGIN_LOGS", [])
+    PROVIDER_ONBOARDS[:] = data.get("PROVIDER_ONBOARDS", [])
+    PROVIDER_APPLIES[:] = data.get("PROVIDER_APPLIES", [])
+    PROVIDERS[:] = data.get("PROVIDERS", [])
+    PROVIDER_AUDIT_LOGS[:] = data.get("PROVIDER_AUDIT_LOGS", [])
+    UPLOADED_FILES.update(data.get("UPLOADED_FILES", {}))
+    SERVICE_ABILITIES[:] = data.get("SERVICE_ABILITIES", [])
+    SERVICE_CONTACT_LOGS[:] = data.get("SERVICE_CONTACT_LOGS", [])
+    SERVICE_DEMANDS[:] = data.get("SERVICE_DEMANDS", [])
+    SERVICE_RECORDS[:] = data.get("SERVICE_RECORDS", [])
+    SERVICE_EVIDENCES[:] = data.get("SERVICE_EVIDENCES", [])
+    SERVICE_DEMAND_LOGS[:] = data.get("SERVICE_DEMAND_LOGS", [])
+
+
+@app.on_event("startup")
+def _on_startup():
+    _load_data()
+
+
+@app.middleware("http")
+async def persist_data_middleware(request, call_next):
+    response = await call_next(request)
+    if request.method in {"POST", "PUT", "DELETE"} and response.status_code < 500:
+        _save_data()
+    return response
 
 
 def _menus_by_role(role: str) -> list[dict]:
@@ -1082,10 +1143,6 @@ def admin_contact_log_stat(user=Depends(current_user)):
     return {"code": 200, "data": stat}
 
 # 第四闭环：需求与留痕
-SERVICE_DEMANDS: list[dict] = []
-SERVICE_RECORDS: list[dict] = []
-SERVICE_EVIDENCES: list[dict] = []
-SERVICE_DEMAND_LOGS: list[dict] = []
 
 
 class FarmerDemandCreateRequest(BaseModel):

@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang='zh-CN'>
+<head>
+  <meta charset='UTF-8'>
+  <meta name='viewport' content='width=device-width,initial-scale=1'>
+  <title>我的需求</title>
+  <link rel='stylesheet' href='/theme.css'>
+  <style>
+    table{width:100%;border-collapse:collapse}th,td{border:1px solid #dbe4db;padding:8px}th{background:#eef7ee}
+    .op{display:flex;gap:8px;align-items:center;white-space:nowrap}.op a,.op button{margin:0}
+    .addr{max-width:280px;word-break:break-all}
+  </style>
+</head>
+<body>
+  <div class='banner'>我的需求</div>
+  <h1>我的需求列表</h1>
+  <p><a href='/mini/farmer-home'>返回首页</a></p>
+  <div class='table-wrap'>
+    <table>
+      <thead><tr><th>ID</th><th>服务类型</th><th>地址</th><th>数量</th><th>状态</th><th style='width:150px'>操作</th></tr></thead>
+      <tbody id='rows'></tbody>
+    </table>
+  </div>
+  <script>
+    const t=localStorage.getItem('mini_token');if(!t)location.href='/mini/login';
+    const typeMap={AGRICULTURAL_MACHINERY:'农机服务',SEEDLING:'育秧服务',DRYING:'烘干服务',STORAGE:'仓储服务',PLANTING_GUIDE:'种植指导',OTHER:'其他服务'};
+    const statusMap={SUBMITTED:'已提交',CONTACTED:'已联系',SERVICING:'服务中',COMPLETED:'已完成',CANCELLED:'已取消'};
+    async function cancel(id){const r=await fetch('/api/farmer/demand/cancel',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${t}`},body:JSON.stringify({demandId:id})});const d=await r.json();alert(d.message||d.detail);load();}
+    window.cancelDemand=cancel;
+    async function load(){const r=await fetch('/api/farmer/demand/list',{headers:{Authorization:`Bearer ${t}`}});const d=await r.json();rows.innerHTML=(d.data||[]).map(x=>`<tr><td>${x.id}</td><td>${typeMap[x.serviceType]||x.serviceType}</td><td class='addr'>${x.serviceAddress}</td><td>${x.quantity}${x.unit||''}</td><td>${statusMap[x.status]||x.status}</td><td><div class='op'><a href='/mini/farmer-demand-detail?id=${x.id}'>详情</a><button onclick='cancelDemand(${x.id})'>取消</button></div></td></tr>`).join('');}
+    load();
+  </script>
+</body>
+</html>

@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>小程序登录测试页</title><link rel='stylesheet' href='/theme.css'/>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans',
+          'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+        background: #f1f5f9;
+        color: #0f172a;
+      }
+      .wrap {
+        width: min(94vw, 460px);
+        margin: 28px auto;
+      }
+      .card {
+        background: #fff;
+        border-radius: 16px;
+        box-shadow: 0 14px 35px rgba(15, 23, 42, 0.1);
+        padding: 20px;
+      }
+      .title {
+        margin: 0;
+        font-size: 22px;
+      }
+      .desc {
+        margin: 8px 0 16px;
+        font-size: 14px;
+        color: #64748b;
+      }
+      .btn {
+        width: 100%;
+        border: 0;
+        border-radius: 10px;
+        padding: 11px 12px;
+        font-size: 14px;
+        cursor: pointer;
+        margin-bottom: 10px;
+      }
+      .btn-primary {
+        color: #fff;
+        background: linear-gradient(90deg, #10b981, #14b8a6);
+      }
+      .btn-secondary {
+        color: #fff;
+        background: linear-gradient(90deg, #0ea5e9, #2563eb);
+      }
+      .input-row {
+        display: flex;
+        gap: 8px;
+        margin: 12px 0;
+      }
+      .input {
+        flex: 1;
+        border: 1px solid #cbd5e1;
+        border-radius: 10px;
+        padding: 10px 11px;
+      }
+      .link {
+        color: #2563eb;
+        text-decoration: none;
+        font-size: 14px;
+      }
+      #msg {
+        min-height: 20px;
+        margin-top: 8px;
+        color: #dc2626;
+        font-size: 13px;
+      }
+    </style>
+  </head>
+  <body><div class="banner">农服数字平台</div>
+    <div class="wrap">
+      <div class="card">
+        <h1 class="title">小程序登录测试</h1>
+        <p class="desc">模拟微信 code 登录，用于第一阶段联调</p>
+
+        <button class="btn btn-primary" data-code="farmer-test-code">农户测试登录</button>
+        <button class='btn btn-secondary' onclick="location.href='/mini/provider-login'">服务方专用登录</button>
+
+        <div class="input-row">
+          <input class="input" id="code" placeholder="输入自定义 code" />
+          <button class="btn btn-secondary" id="custom-login" style="width: auto; margin: 0">登录</button>
+        </div>
+
+        <a class="link" href="/mini/bind-phone">去绑定手机号预留页</a>
+        <p id="msg"></p>
+      </div>
+    </div>
+
+    <script>
+      const msg = document.getElementById('msg');
+
+      async function doLogin(code) {
+        msg.textContent = '登录中...';
+        const res = await fetch('/api/auth/wechat-login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code }),
+        });
+        const data = await res.json();
+
+        if (!res.ok) {
+          msg.textContent = data.detail || '登录失败';
+          return;
+        }
+
+        localStorage.setItem('mini_token', data.token);
+        const userRes = await fetch('/api/auth/current-user', {
+          headers: { Authorization: `Bearer ${data.token}` },
+        });
+        const user = await userRes.json();
+
+        if (!userRes.ok) {
+          msg.textContent = user.detail || '获取用户失败';
+          return;
+        }
+
+        if (user.role === 'FARMER') {
+          location.href = '/mini/farmer-home';
+          return;
+        }
+        if (user.role === 'PROVIDER') {
+          const statusRes = await fetch('/api/provider/apply/status', {
+            headers: { Authorization: `Bearer ${data.token}` },
+          });
+          const statusData = await statusRes.json();
+          if (!statusRes.ok) {
+            msg.textContent = statusData.detail || '状态查询失败';
+            return;
+          }
+          if (statusData.auditStatus === 'NOT_SUBMITTED') {
+            location.href = '/mini/provider-onboard';
+            return;
+          }
+          if (statusData.auditStatus === 'PENDING') {
+            location.href = '/mini/provider-apply-status';
+            return;
+          }
+          if (statusData.auditStatus === 'REJECTED') {
+            location.href = '/mini/provider-apply-reject';
+            return;
+          }
+          if (statusData.auditStatus === 'APPROVED') {
+            location.href = '/mini/provider-home';
+            return;
+          }
+          msg.textContent = `当前状态不可进入：${statusData.auditStatus}`;
+          return;
+        }
+        location.href = '/mini/role-select';
+      }
+
+      document.querySelectorAll('button[data-code]').forEach((btn) => {
+        btn.addEventListener('click', () => doLogin(btn.dataset.code));
+      });
+
+      document.getElementById('custom-login').addEventListener('click', () => {
+        const code = document.getElementById('code').value.trim();
+        if (!code) {
+          msg.textContent = '请输入 code';
+          return;
+        }
+        doLogin(code);
+      });
+    </script>
+  </body>
+</html>

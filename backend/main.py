@@ -418,6 +418,10 @@ def mini_farmer_demand_detail_page():
 def mini_provider_demand_list_page():
     return FileResponse(MINI_DIR / "provider-demand-list.html")
 
+@app.get("/mini/provider-demand-detail")
+def mini_provider_demand_detail_page():
+    return FileResponse(MINI_DIR / "provider-demand-detail.html")
+
 @app.get("/mini/provider-record-create")
 def mini_provider_record_create_page():
     return FileResponse(MINI_DIR / "provider-record-create.html")

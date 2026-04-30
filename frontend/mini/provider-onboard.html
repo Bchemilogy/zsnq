@@ -63,7 +63,7 @@
             <label>其他文件<input id="otherFile" type="file" accept=".jpg,.jpeg,.png,.pdf,.doc,.docx,.xls,.xlsx" /></label>
           </div>
           <p>
-            <button class="btn b2" type="button" id="uploadFiles">上传附件</button>
+            <button class="btn b2" type="button" id="uploadFiles">先上传附件</button>
             <button class="btn b1" type="submit">提交入驻申请</button>
             <button class="btn b3" type="button" id="resubmit">驳回后重提</button>
           </p>
@@ -75,6 +75,7 @@
       const token = localStorage.getItem('mini_token');
       if (!token) location.href = '/mini/login';
       let attachments = [];
+      let uploaded = false;
 
       async function uploadOne(file, fileTag) {
         const formData = new FormData();
@@ -95,6 +96,7 @@
           const list = [await uploadOne(licenseFile, 'BUSINESS_LICENSE'), await uploadOne(deviceFile, 'DEVICE_PHOTO')];
           if (otherFile) list.push(await uploadOne(otherFile, 'OTHER_FILE'));
           attachments = list;
+          uploaded = true;
           alert(`附件上传成功，共 ${attachments.length} 个文件`);
         } catch (e) { alert(e.message); }
       });
@@ -115,6 +117,9 @@
       }
 
       async function submitTo(url) {
+        if (!uploaded || attachments.length < 2) {
+          return alert('请先选择附件并点击“先上传附件”后再提交审核');
+        }
         const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify(buildPayload()) });
         const data = await res.json();
         if(res.ok){alert(`${data.message}`); location.href = '/mini/provider-apply-status';}
